@@ -40,7 +40,7 @@ public sealed partial class SourcesViewModel : PageViewModel
     private bool _hasDuplicationRisk;
 
     public SourcesViewModel(IAudioEngine engine, IAudioApplicationCatalog catalog, ILogger<SourcesViewModel> logger)
-        : base("sources", "Fuentes", "",
+        : base("sources", "Fuentes", "\uE71D",
             "Elige qué aplicaciones entran en el mezclador. Cada una es un canal independiente.")
     {
         _engine = engine;

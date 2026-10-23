@@ -8,8 +8,12 @@ using Sonari.Audio.Core.Devices;
 using Sonari.Audio.Core.Endpoints;
 using Sonari.Audio.Core.Engine;
 using Sonari.Audio.Devices;
+using Sonari.Audio.Core.Playback;
 using Sonari.Audio.Engine;
+using Sonari.Audio.Engine.Playback;
 using Sonari.Audio.Output;
+using Sonari.Audio.Playback;
+using Sonari.Infrastructure.Soundboard;
 using Sonari.Infrastructure.Settings;
 using Sonari.Infrastructure.Storage;
 using Sonari.Presentation.Services;
@@ -52,6 +56,9 @@ internal static class CompositionRoot
         services.AddSingleton<IProcessCaptureStreamFactory, WasapiProcessCaptureStreamFactory>();
         services.AddSingleton<IProcessLocator, ProcessLocator>();
         services.AddSingleton<IAudioApplicationCatalog, AudioApplicationCatalog>();
+        services.AddSingleton<ISoundDecoder, MediaFoundationSoundDecoder>();
+        services.AddSingleton<ISoundClipProvider, SoundClipCache>();
+        services.AddSingleton<ISoundboardStore, SoundboardStore>();
         services.AddSingleton<IAudioEngine, AudioEngine>();
         services.AddHostedService<AudioEngineLifetime>();
 
@@ -62,6 +69,8 @@ internal static class CompositionRoot
         services.AddSingleton<PageViewModel>(sp => sp.GetRequiredService<MixerViewModel>());
         services.AddSingleton<SourcesViewModel>();
         services.AddSingleton<PageViewModel>(sp => sp.GetRequiredService<SourcesViewModel>());
+        services.AddSingleton<SoundboardViewModel>();
+        services.AddSingleton<PageViewModel>(sp => sp.GetRequiredService<SoundboardViewModel>());
         foreach (PlannedPageViewModel page in PlannedPageViewModel.CreateDefaults())
         {
             services.AddSingleton<PageViewModel>(page);

@@ -10,8 +10,29 @@ internal sealed class ChannelControl : IChannelControl
     public const float MaxGainDb = 24f;
 
     private float _gainDb;
+    private float _balance;
     private int _muted;
     private int _sendToMonitor;
+
+    public float Balance
+    {
+        get => Volatile.Read(ref _balance);
+        set => Volatile.Write(ref _balance, float.IsNaN(value) ? 0f : Math.Clamp(value, -1f, 1f));
+    }
+
+    /// <summary>
+    /// Ganancias lineales izquierda/derecha: fader por balance. Ley de balance (no de panorama): en el centro ambos lados
+    /// quedan a 1, y al girar solo se atenúa el lado contrario.
+    /// </summary>
+    public (float Left, float Right) StereoGains
+    {
+        get
+        {
+            float fader = FaderLinear;
+            float balance = Balance;
+            return (fader * (balance > 0 ? 1 - balance : 1), fader * (balance < 0 ? 1 + balance : 1));
+        }
+    }
 
     public float GainDb
     {

@@ -1,4 +1,5 @@
 using Sonari.Audio.Core.Formats;
+using Sonari.Audio.Core.Playback;
 
 namespace Sonari.Audio.Core.Engine;
 
@@ -43,8 +44,11 @@ public readonly record struct StereoPeak(float Left, float Right)
 /// Las de cada fuente están en <see cref="ISourceChannel.ReadMetrics"/>.
 /// </summary>
 /// <param name="Resyncs">Veces que se descartó audio acumulado (suma de todas las fuentes).</param>
+/// <param name="MonitorGainReductionDb">Máxima reducción aplicada por el limitador desde la lectura anterior (0 = no actuó).</param>
+/// <param name="ClippedSamples">Muestras que tuvo que recortar la protección final; con el limitador debería quedarse en 0.</param>
 public readonly record struct EngineMetrics(
     StereoPeak MonitorOutput,
+    float MonitorGainReductionDb,
     long ClippedSamples,
     long Resyncs);
 
@@ -53,6 +57,9 @@ public interface IChannelControl
     float GainDb { get; set; }
 
     bool IsMuted { get; set; }
+
+    /// <summary>Balance estéreo de −1 (solo izquierda) a 1 (solo derecha). En 0 no altera la señal.</summary>
+    float Balance { get; set; }
 
     bool SendToMonitor { get; set; }
 }
@@ -72,6 +79,9 @@ public interface IAudioEngine : IAsyncDisposable
 {
     EngineStatus Status { get; }
 
+    /// <summary>Formato con el que está funcionando el motor, o <c>null</c> si está detenido.</summary>
+    AudioFormat? Format { get; }
+
     /// <summary>Puede llegar en cualquier hilo.</summary>
     event EventHandler<EngineStatus>? StatusChanged;
 
@@ -82,6 +92,18 @@ public interface IAudioEngine : IAsyncDisposable
     event EventHandler? SourcesChanged;
 
     ISourceChannel Microphone { get; }
+
+    /// <summary>Canal del reproductor de sonidos (siempre existe, no se puede quitar).</summary>
+    ISourceChannel SoundChannel { get; }
+
+    /// <summary>Reproductor de sonidos. Sus órdenes solo suenan con el motor en marcha.</summary>
+    ISoundPlayer Sounds { get; }
+
+    /// <summary>
+    /// Silencio global: corta todo lo que sale de Sonari (monitoreo y, desde la Fase 5, micrófono virtual) con un
+    /// fundido corto. Las fuentes siguen capturando, así que al quitarlo el audio vuelve al instante.
+    /// </summary>
+    bool IsGlobalMuted { get; set; }
 
     /// <summary>Todas las fuentes, con el micrófono primero. Instantánea: una lista nueva en cada cambio.</summary>
     IReadOnlyList<ISourceChannel> Sources { get; }

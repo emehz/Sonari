@@ -2,7 +2,7 @@
 
 Mezclador de audio en tiempo real para Windows: micrófono, aplicaciones concretas, audio del sistema y sonidos, todo enviado a un micrófono virtual y con monitoreo independiente por auriculares.
 
-> **Estado: Fase 3 (captura por aplicación).** Micrófono, aplicaciones concretas y audio del sistema, cada uno como canal independiente, con compensación de deriva, medidores y reconexión automática. Todavía no hay reproductor de sonidos (Fase 4) ni micrófono virtual (Fase 5). Detalles en [docs/02-fase-2-motor-basico.md](docs/02-fase-2-motor-basico.md) y [docs/03-fase-3-captura-por-aplicacion.md](docs/03-fase-3-captura-por-aplicacion.md).
+> **Estado: Fase 4 (mezclador y sonidos).** Micrófono, aplicaciones, audio del sistema y panel de sonidos, cada uno como canal independiente con ganancia, balance, silencio y medidores, y un limitador que evita la saturación. Todavía no hay micrófono virtual (Fase 5), efectos de voz (Fase 6) ni escenas y atajos (Fase 7). Detalles en la carpeta [docs](docs).
 
 ## Requisitos
 
@@ -43,6 +43,7 @@ src/
   Sonari.Audio.Engine   Grafo de mezcla, compensación de deriva, supervisor (sin NAudio)
   Sonari.Audio.Capture  Captura WASAPI: micrófono, aplicaciones y sistema
   Sonari.Audio.Output   Salida WASAPI (monitoreo)
+  Sonari.Audio.Playback Decodificación de archivos de audio (Media Foundation)
   Sonari.Audio.Devices  Endpoints WASAPI, notificaciones de dispositivos
   Sonari.Infrastructure Ajustes en JSON con escritura atómica y rutas
 tests/
@@ -51,6 +52,7 @@ docs/
   01-viabilidad-y-arquitectura.md   Diseño completo, riesgos y plan por fases
   02-fase-2-motor-basico.md         Motor de audio: decisiones, pruebas y limitaciones
   03-fase-3-captura-por-aplicacion.md  Captura por aplicación y audio del sistema
+  04-fase-4-mezclador-y-sonidos.md     Limitador, balance, silencio global y panel de sonidos
 ```
 
 `dotnet test` usa Microsoft.Testing.Platform (configurado en `global.json`), como exige xUnit v3 con el SDK de .NET 10. El Explorador de pruebas de Visual Studio funciona sin cambios.
@@ -58,6 +60,7 @@ docs/
 ## Dónde guarda datos
 
 * Configuración: `%APPDATA%\Sonari\settings.json`
+* Panel de sonidos (bancos y rutas de los archivos, no los archivos en sí): `%APPDATA%\Sonari\soundboard.json`
 * Registros técnicos (sin audio ni datos personales): `%LOCALAPPDATA%\Sonari\logs\`
 
 Sonari nunca graba ni guarda audio sin una acción explícita del usuario, y solo captura las fuentes que el usuario selecciona.

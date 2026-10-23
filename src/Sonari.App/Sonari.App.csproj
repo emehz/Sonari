@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Sonari.Audio.Devices\Sonari.Audio.Devices.csproj" />
     <ProjectReference Include="..\Sonari.Audio.Engine\Sonari.Audio.Engine.csproj" />
     <ProjectReference Include="..\Sonari.Audio.Output\Sonari.Audio.Output.csproj" />
+    <ProjectReference Include="..\Sonari.Audio.Playback\Sonari.Audio.Playback.csproj" />
     <ProjectReference Include="..\Sonari.Infrastructure\Sonari.Infrastructure.csproj" />
     <ProjectReference Include="..\Sonari.Presentation\Sonari.Presentation.csproj" />
   </ItemGroup>

@@ -37,7 +37,7 @@ public sealed partial class SettingsViewModel : PageViewModel
         IShellIntegration shell,
         AppPaths paths,
         ILogger<SettingsViewModel> logger)
-        : base("settings", "Ajustes", "", "Formato del motor, carpetas de datos y diagnóstico.")
+        : base("settings", "Ajustes", "\uE713", "Formato del motor, carpetas de datos y diagnóstico.")
     {
         _settings = settings;
         _shell = shell;

@@ -27,7 +27,7 @@ public sealed partial class DevicesViewModel : PageViewModel
     private bool _hasVirtualDevice;
 
     public DevicesViewModel(IAudioDeviceCatalog catalog, ILogger<DevicesViewModel> logger)
-        : base("devices", "Dispositivos", "",
+        : base("devices", "Dispositivos", "\uE7F5",
             "Entradas y salidas de audio detectadas en Windows y compatibilidad del sistema.")
     {
         _catalog = catalog;

@@ -19,20 +19,10 @@ public sealed class PlannedPageViewModel(
 
     public IReadOnlyList<string> PlannedFeatures { get; } = plannedFeatures;
 
-    /// <summary>Páginas pendientes, en el orden en que aparecen en la navegación (después de Mezclador y Fuentes).</summary>
+    /// <summary>Páginas pendientes, en el orden en que aparecen en la navegación (después de Mezclador, Fuentes y Sonidos).</summary>
     public static IEnumerable<PlannedPageViewModel> CreateDefaults()
     {
-        yield return new("soundboard", "Sonidos", "",
-            "Bancos de sonidos con atajos globales y parada de emergencia.",
-            4,
-            [
-                "Importar WAV, MP3 y otros formatos de Media Foundation",
-                "Reproducción simultánea, pausa, bucle y volumen por sonido",
-                "Categorías, bancos y atajos de teclado globales",
-                "Parada de emergencia de todos los efectos",
-            ]);
-
-        yield return new("voice", "Voz", "",
+        yield return new("voice", "Voz", "\uE720",
             "Cadena de efectos en tiempo real para el micrófono.",
             6,
             [
@@ -42,7 +32,7 @@ public sealed class PlannedPageViewModel(
                 "Arquitectura preparada para módulos de IA opcionales",
             ]);
 
-        yield return new("scenes", "Escenas", "",
+        yield return new("scenes", "Escenas", "\uE8A9",
             "Configuraciones completas que se activan con un clic o un atajo.",
             7,
             [

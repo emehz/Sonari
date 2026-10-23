@@ -9,6 +9,9 @@ public enum SourceKind
 
     /// <summary>Todo lo que suena en Windows excepto el propio Sonari (Application Loopback en modo exclusión).</summary>
     SystemAudio,
+
+    /// <summary>Reproductor de sonidos: todos los sonidos del panel salen por este canal.</summary>
+    SoundPlayer,
 }
 
 public enum SourceStatus

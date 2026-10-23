@@ -3,6 +3,9 @@ using Microsoft.Extensions.Logging;
 using Sonari.Audio.Core.Devices;
 using Sonari.Audio.Core.Endpoints;
 using Sonari.Audio.Core.Engine;
+using Sonari.Audio.Core.Formats;
+using Sonari.Audio.Core.Playback;
+using Sonari.Audio.Engine.Playback;
 using Sonari.Audio.Engine.Routing;
 
 namespace Sonari.Audio.Engine;
@@ -28,6 +31,8 @@ public sealed class AudioEngine : IAudioEngine
     private readonly IAudioDeviceWatcher? _watcher;
     private readonly ILogger<AudioEngine> _logger;
     private readonly SourceChannel _microphone;
+    private readonly SourceChannel _soundsSource;
+    private readonly SoundPlayer _soundPlayer = new();
     private readonly BusControl _monitor = new();
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private readonly SemaphoreSlim _wake = new(0, int.MaxValue);
@@ -51,6 +56,7 @@ public sealed class AudioEngine : IAudioEngine
     private int _consecutiveOpenFailures;
     private int _streamFailed;
     private int _defaultDeviceChanged;
+    private int _globalMuted;
 
     public AudioEngine(
         ICaptureStreamFactory captureFactory,
@@ -69,7 +75,11 @@ public sealed class AudioEngine : IAudioEngine
 
         // Por seguridad frente a la realimentación, el micrófono no se oye hasta que el usuario lo pide.
         _microphone = new SourceChannel(SourceKind.Microphone, "Micrófono", target: null, RaiseSourcesChanged);
-        _sources = [_microphone];
+
+        // Los sonidos sí se oyen por defecto: son efectos que lanzas tú y no tienen otra vía para llegar a tus oídos.
+        _soundsSource = new SourceChannel(SourceKind.SoundPlayer, "Sonidos", target: null, RaiseSourcesChanged);
+        _soundsSource.SendToMonitor = true;
+        _sources = [_microphone, _soundsSource];
 
         if (_watcher is not null)
         {
@@ -79,11 +89,30 @@ public sealed class AudioEngine : IAudioEngine
 
     public EngineStatus Status => Volatile.Read(ref _status);
 
+    public AudioFormat? Format => Volatile.Read(ref _options)?.Format;
+
     public event EventHandler<EngineStatus>? StatusChanged;
 
     public event EventHandler? SourcesChanged;
 
     public ISourceChannel Microphone => _microphone;
+
+    public ISourceChannel SoundChannel => _soundsSource;
+
+    public ISoundPlayer Sounds => _soundPlayer;
+
+    public bool IsGlobalMuted
+    {
+        get => Volatile.Read(ref _globalMuted) != 0;
+        set
+        {
+            if (Interlocked.Exchange(ref _globalMuted, value ? 1 : 0) != (value ? 1 : 0))
+            {
+                _logger.LogInformation("Silencio global {State}", value ? "activado" : "desactivado");
+                RaiseSourcesChanged();
+            }
+        }
+    }
 
     public IReadOnlyList<ISourceChannel> Sources => Volatile.Read(ref _sources);
 
@@ -109,7 +138,8 @@ public sealed class AudioEngine : IAudioEngine
             {
                 Volatile.Write(ref _options, options);
                 _targetFrames = options.Format.FramesFor(TimeSpan.FromMilliseconds(TargetBufferMilliseconds(options)));
-                _monitorBus = new MonitorBus(_monitor, options.Format.Channels);
+                _monitorBus = new MonitorBus(_monitor, options.Format, () => IsGlobalMuted);
+                _soundPlayer.Configure(options.Format);
                 foreach (SourceChannel source in _sources)
                 {
                     source.Mixer = CreateMixer(source);
@@ -133,7 +163,7 @@ public sealed class AudioEngine : IAudioEngine
             {
                 foreach (SourceChannel source in _sources)
                 {
-                    if (source.Kind != SourceKind.Microphone)
+                    if (IsProcessSource(source.Kind))
                     {
                         StartRunner(source);
                     }
@@ -190,9 +220,9 @@ public sealed class AudioEngine : IAudioEngine
     public void RemoveSource(ISourceChannel source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        if (source.Kind == SourceKind.Microphone)
+        if (!IsProcessSource(source.Kind))
         {
-            throw new InvalidOperationException("El micrófono no se puede quitar del mezclador.");
+            throw new InvalidOperationException($"«{source.DisplayName}» forma parte fija del mezclador y no se puede quitar.");
         }
 
         ProcessCaptureRunner? runner;
@@ -225,7 +255,8 @@ public sealed class AudioEngine : IAudioEngine
         MonitorBus? bus = Volatile.Read(ref _monitorBus);
         return bus is null
             ? default
-            : new EngineMetrics(bus.OutputMeter.ReadAndReset(), bus.ClippedSamples, bus.Resyncs);
+            : new EngineMetrics(
+                bus.OutputMeter.ReadAndReset(), bus.Limiter.ReadAndResetGainReductionDb(), bus.ClippedSamples, bus.Resyncs);
     }
 
     public async ValueTask DisposeAsync()
@@ -264,18 +295,21 @@ public sealed class AudioEngine : IAudioEngine
         RaiseSourcesChanged();
     }
 
-    private MixerChannel CreateMixer(SourceChannel source) =>
-        new(source.Control, _options!.Format, _targetFrames, isIntermittent: source.Kind != SourceKind.Microphone);
+    private static bool IsProcessSource(SourceKind kind) => kind is SourceKind.Application or SourceKind.SystemAudio;
+
+    private ChannelStrip CreateMixer(SourceChannel source) => source.Kind == SourceKind.SoundPlayer
+        ? new GeneratorChannel(source.Control, _options!.Format.Channels, _soundPlayer.Render)
+        : new MixerChannel(source.Control, _options!.Format, _targetFrames, isIntermittent: source.Kind != SourceKind.Microphone);
 
     /// <summary>Con <see cref="_sourcesLock"/> tomado.</summary>
     private void PublishBusChannels() =>
-        _monitorBus?.SetChannels(_sources.Select(s => s.Mixer).OfType<MixerChannel>().ToArray());
+        _monitorBus?.SetChannels(_sources.Select(s => s.Mixer).OfType<ChannelStrip>().ToArray());
 
     /// <summary>Con <see cref="_sourcesLock"/> tomado y el motor en marcha.</summary>
     private void StartRunner(SourceChannel source)
     {
         var runner = new ProcessCaptureRunner(
-            source, source.Mixer!, _options!.Format, _processCaptureFactory, _processLocator, _logger);
+            source, (MixerChannel)source.Mixer!, _options!.Format, _processCaptureFactory, _processLocator, _logger);
         _runners[source.Id] = runner;
         runner.Start();
     }
@@ -348,11 +382,14 @@ public sealed class AudioEngine : IAudioEngine
                 source.Mixer = null;
             }
 
+            // Con el render ya parado: lo que sonaba se descarta para que la UI no muestre reproducciones fantasma.
+            _soundPlayer.Configure(_options?.Format ?? AudioFormat.Default);
             Volatile.Write(ref _monitorBus, null);
             Volatile.Write(ref _options, null);
         }
 
         _microphone.SetStatus(SourceStatus.Stopped, "Motor detenido");
+        _soundsSource.SetStatus(SourceStatus.Stopped, "Motor detenido");
 
         if (_previousGcMode is { } mode)
         {
@@ -407,7 +444,7 @@ public sealed class AudioEngine : IAudioEngine
     {
         EngineOptions options = _options ?? throw new InvalidOperationException("Motor sin configurar.");
         MonitorBus bus = _monitorBus!;
-        MixerChannel micMixer = _microphone.Mixer!;
+        MixerChannel micMixer = (MixerChannel)_microphone.Mixer!;
         int generation = Interlocked.Increment(ref _generation);
         Volatile.Write(ref _streamFailed, 0);
         bus.ResetForRestart();
@@ -431,6 +468,7 @@ public sealed class AudioEngine : IAudioEngine
                 _render.DeviceName, _render.ReportedLatencyMilliseconds);
 
             _microphone.SetStatus(SourceStatus.Active, _capture.DeviceName);
+            _soundsSource.SetStatus(SourceStatus.Active, "Listo");
             SetStatus(new EngineStatus(
                 EngineState.Running,
                 "En marcha",
@@ -452,6 +490,7 @@ public sealed class AudioEngine : IAudioEngine
                 _consecutiveOpenFailures);
             CloseStreams();
             _microphone.SetStatus(SourceStatus.Waiting, ex.Message);
+            _soundsSource.SetStatus(SourceStatus.Waiting, "Esperando a la salida de audio…");
             SetStatus(new EngineStatus(EngineState.Recovering, $"{ex.Message} Reintentando cada {RetryInterval.TotalSeconds:0} s…"));
             return false;
         }

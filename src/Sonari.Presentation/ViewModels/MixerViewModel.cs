@@ -73,12 +73,18 @@ public sealed partial class MixerViewModel : PageViewModel
     [ObservableProperty]
     private bool _hasDuplicationRisk;
 
+    [ObservableProperty]
+    private bool _isGlobalMuted;
+
+    [ObservableProperty]
+    private string _limiterText = "0,0 dB";
+
     public MixerViewModel(
         IAudioEngine engine,
         IAudioDeviceCatalog catalog,
         ISettingsService settings,
         ILogger<MixerViewModel> logger)
-        : base("mixer", "Mezclador", "",
+        : base("mixer", "Mezclador", "\uE9E9",
             "Cada fuente es un canal independiente. El envío al micrófono virtual llegará en la Fase 5.")
     {
         _engine = engine;
@@ -89,6 +95,7 @@ public sealed partial class MixerViewModel : PageViewModel
 
         MonitorGainDb = engine.Monitor.GainDb;
         MonitorMuted = engine.Monitor.IsMuted;
+        IsGlobalMuted = engine.IsGlobalMuted;
 
         _meterTimer = new DispatcherTimer(DispatcherPriority.Render) { Interval = MeterInterval };
         _meterTimer.Tick += (_, _) => UpdateMeters();
@@ -191,6 +198,8 @@ public sealed partial class MixerViewModel : PageViewModel
 
     partial void OnMonitorMutedChanged(bool value) => _engine.Monitor.IsMuted = value;
 
+    partial void OnIsGlobalMutedChanged(bool value) => _engine.IsGlobalMuted = value;
+
     partial void OnSelectedInputChanged(DeviceOption? value) => _ = OnDeviceSelectionChangedAsync();
 
     partial void OnSelectedMonitorChanged(DeviceOption? value) => _ = OnDeviceSelectionChangedAsync();
@@ -265,6 +274,7 @@ public sealed partial class MixerViewModel : PageViewModel
 
         HasDuplicationRisk = sources.Any(s => s.Kind == SourceKind.SystemAudio) &&
             sources.Any(s => s.Kind == SourceKind.Application);
+        IsGlobalMuted = _engine.IsGlobalMuted;
     }
 
     private void ApplyStatus(EngineStatus status)
@@ -310,6 +320,7 @@ public sealed partial class MixerViewModel : PageViewModel
         MonitorPeakDb = _monitorMeter.PeakDb;
         Resyncs = metrics.Resyncs;
         ClippedSamples = metrics.ClippedSamples;
+        LimiterText = metrics.MonitorGainReductionDb > 0.05f ? $"−{metrics.MonitorGainReductionDb:0.0} dB" : "0,0 dB";
     }
 
     private void PostToUi(Action action)

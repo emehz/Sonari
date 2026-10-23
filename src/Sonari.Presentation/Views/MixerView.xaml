@@ -69,6 +69,14 @@
           <Slider Minimum="-60" Maximum="12" Value="{Binding GainDb}" SmallChange="0.5" LargeChange="3"
                   AutomationProperties.Name="Ganancia del canal" />
 
+          <DockPanel Margin="0,10,0,4">
+            <TextBlock DockPanel.Dock="Right" Text="{Binding BalanceText}" Style="{StaticResource Text.Caption}" />
+            <TextBlock Text="Balance" Style="{StaticResource Text.Caption}" />
+          </DockPanel>
+          <Slider Minimum="-1" Maximum="1" Value="{Binding Balance}" SmallChange="0.05" LargeChange="0.25"
+                  ToolTip="Doble clic para centrar" MouseDoubleClick="OnBalanceDoubleClick"
+                  AutomationProperties.Name="Balance del canal" />
+
           <ToggleButton Style="{StaticResource Switch}" Margin="0,14,0,0" IsChecked="{Binding SendToMonitor}"
                         Content="Enviar al monitoreo" ToolTip="{Binding MonitorHint}" />
           <TextBlock Text="{Binding MonitorHint}" Style="{StaticResource Text.Caption}" Margin="46,4,0,0"
@@ -87,6 +95,22 @@
 
       <!-- Cabecera con el interruptor del motor -->
       <DockPanel Margin="0,0,16,0">
+        <ToggleButton DockPanel.Dock="Right" VerticalAlignment="Top" Margin="8,0,0,0" Height="34"
+                      IsChecked="{Binding IsGlobalMuted}" ToolTip="Corta todo lo que sale de Sonari"
+                      AutomationProperties.Name="Silencio global">
+          <ToggleButton.Style>
+            <Style TargetType="ToggleButton" BasedOn="{StaticResource Toggle.Mute}">
+              <Setter Property="Width" Value="Auto" />
+              <Setter Property="Padding" Value="12,0" />
+            </Style>
+          </ToggleButton.Style>
+          <StackPanel Orientation="Horizontal" Margin="12,0">
+            <TextBlock Text="&#xE74F;" FontFamily="{StaticResource Font.Icons}" FontSize="13" VerticalAlignment="Center"
+                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+            <TextBlock Text="Silencio global" Margin="8,0,0,0" VerticalAlignment="Center"
+                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+          </StackPanel>
+        </ToggleButton>
         <Button DockPanel.Dock="Right" VerticalAlignment="Top" MinWidth="140"
                 Style="{StaticResource Button.Accent}"
                 Command="{Binding ToggleEngineCommand}">
@@ -167,6 +191,13 @@
         </Grid>
       </Border>
 
+      <!-- Aviso de silencio global -->
+      <Border Style="{StaticResource Card}" BorderBrush="{StaticResource Brush.Danger}" Background="#3A1C22" Margin="0,16,16,0" Padding="14,10"
+              Visibility="{Binding IsGlobalMuted, Converter={StaticResource BoolToVisibility}}">
+        <TextBlock Style="{StaticResource Text.Body}" Foreground="{StaticResource Brush.Danger}"
+                   Text="Silencio global activado: no sale nada de Sonari. Las fuentes siguen capturando y vuelven al instante al quitarlo." />
+      </Border>
+
       <!-- Aviso de duplicación -->
       <Border Style="{StaticResource Card.Warning}" Margin="0,16,16,0"
               Visibility="{Binding HasDuplicationRisk, Converter={StaticResource BoolToVisibility}}">
@@ -227,8 +258,12 @@
           <StackPanel>
             <TextBlock Text="Diagnóstico del motor" Style="{StaticResource Text.Section}" />
             <TextBlock Style="{StaticResource Text.Body}" Margin="0,4,0,14"
-                       Text="Cada canal muestra su buffer, su deriva y sus vaciados. «Pausas» en una aplicación significa que dejó de sonar, no es un error." />
-            <UniformGrid Columns="2">
+                       Text="Cada canal muestra su buffer, su deriva y sus vaciados. «Pausas» en una aplicación significa que dejó de sonar, no es un error. El limitador evita que la mezcla supere −0,3 dBFS." />
+            <UniformGrid Columns="3">
+              <StackPanel>
+                <TextBlock Text="Limitador (reducción)" Style="{StaticResource StatLabel}" />
+                <TextBlock Text="{Binding LimiterText}" Style="{StaticResource StatValue}" />
+              </StackPanel>
               <StackPanel>
                 <TextBlock Text="Resincronizaciones" Style="{StaticResource StatLabel}" />
                 <TextBlock Text="{Binding Resyncs}" Style="{StaticResource StatValue}" />

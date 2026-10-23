@@ -13,7 +13,7 @@ internal sealed class SourceChannel : ISourceChannel
     private SourceStatus _status = SourceStatus.Stopped;
     private string _statusMessage = "Motor detenido";
     private int? _processId;
-    private MixerChannel? _mixer;
+    private ChannelStrip? _mixer;
 
     public SourceChannel(SourceKind kind, string displayName, ApplicationTarget? target, Action onChanged)
     {
@@ -68,10 +68,16 @@ internal sealed class SourceChannel : ISourceChannel
         }
     }
 
-    public MixerChannel? Mixer
+    public ChannelStrip? Mixer
     {
         get => Volatile.Read(ref _mixer);
         set => Volatile.Write(ref _mixer, value);
+    }
+
+    public float Balance
+    {
+        get => Control.Balance;
+        set => Control.Balance = value;
     }
 
     public float GainDb

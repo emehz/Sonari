@@ -23,6 +23,10 @@ public sealed partial class ChannelViewModel : ObservableObject
     private bool _sendToMonitor;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BalanceText))]
+    private double _balance;
+
+    [ObservableProperty]
     private SourceStatus _status;
 
     [ObservableProperty]
@@ -43,6 +47,7 @@ public sealed partial class ChannelViewModel : ObservableObject
         _gainDb = source.GainDb;
         _isMuted = source.IsMuted;
         _sendToMonitor = source.SendToMonitor;
+        _balance = source.Balance;
         Icon = ShellIcons.ForExecutable(source.ExecutablePath);
         RefreshStatus();
     }
@@ -57,7 +62,8 @@ public sealed partial class ChannelViewModel : ObservableObject
 
     public bool IsMicrophone => Kind == SourceKind.Microphone;
 
-    public bool CanRemove => !IsMicrophone;
+    /// <summary>El micrófono y el canal de sonidos son fijos; las aplicaciones y el sistema se pueden quitar.</summary>
+    public bool CanRemove => Kind is SourceKind.Application or SourceKind.SystemAudio;
 
     public ImageSource? Icon { get; }
 
@@ -66,14 +72,22 @@ public sealed partial class ChannelViewModel : ObservableObject
     /// <summary>Icono de Segoe para cuando no hay icono del ejecutable.</summary>
     public string Glyph => Kind switch
     {
-        SourceKind.Microphone => "",
-        SourceKind.SystemAudio => "",
-        _ => "",
+        SourceKind.Microphone => "\uE720",
+        SourceKind.SystemAudio => "\uE7F5",
+        SourceKind.SoundPlayer => "\uE8D6",
+        _ => "\uE71D",
     };
 
-    public string MonitorHint => IsMicrophone
-        ? "Usa auriculares: con altavoces el micrófono capta su propia salida y se acopla."
-        : "Ya oyes esta fuente directamente; enviarla al monitoreo la duplicaría con retardo.";
+    public string MonitorHint => Kind switch
+    {
+        SourceKind.Microphone => "Usa auriculares: con altavoces el micrófono capta su propia salida y se acopla.",
+        SourceKind.SoundPlayer => "Activado: oyes los sonidos que lanzas desde el panel.",
+        _ => "Ya oyes esta fuente directamente; enviarla al monitoreo la duplicaría con retardo.",
+    };
+
+    public string BalanceText => Math.Abs(Balance) < 0.01
+        ? "Centro"
+        : Balance < 0 ? $"I {Math.Round(-Balance * 100)}" : $"D {Math.Round(Balance * 100)}";
 
     public string GainText => GainDb <= -60 ? "−∞ dB" : $"{GainDb:+0.0;−0.0;0.0} dB";
 
@@ -91,6 +105,13 @@ public sealed partial class ChannelViewModel : ObservableObject
         PeakDb = _meter.PeakDb;
 
         string buffer = metrics.BufferMilliseconds > 0 ? $"{metrics.BufferMilliseconds:0.0} ms" : "—";
+        if (Kind == SourceKind.SoundPlayer)
+        {
+            // Generado en el propio motor: no tiene buffer de captura ni deriva.
+            Diagnostics = string.Empty;
+            return;
+        }
+
         string text = $"buffer {buffer} · deriva {metrics.DriftPpm:+0;-0;0} ppm · vaciados {metrics.Underruns}";
         if (!IsMicrophone)
         {
@@ -118,4 +139,6 @@ public sealed partial class ChannelViewModel : ObservableObject
     partial void OnIsMutedChanged(bool value) => _source.IsMuted = value;
 
     partial void OnSendToMonitorChanged(bool value) => _source.SendToMonitor = value;
+
+    partial void OnBalanceChanged(double value) => _source.Balance = (float)value;
 }

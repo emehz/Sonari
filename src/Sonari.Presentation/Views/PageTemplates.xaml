@@ -16,6 +16,10 @@
     <views:SourcesView />
   </DataTemplate>
 
+  <DataTemplate DataType="{x:Type vm:SoundboardViewModel}">
+    <views:SoundboardView />
+  </DataTemplate>
+
   <DataTemplate DataType="{x:Type vm:DevicesViewModel}">
     <views:DevicesView />
   </DataTemplate>

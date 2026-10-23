@@ -1,3 +1,4 @@
+using Sonari.Audio.Core.Formats;
 using Sonari.Audio.Engine.Dsp;
 
 namespace Sonari.Audio.Engine.Routing;
@@ -6,24 +7,31 @@ namespace Sonari.Audio.Engine.Routing;
 /// Bus de monitoreo (lo que oyes por los auriculares). Su <see cref="Render"/> lo llama el hilo del dispositivo de
 /// salida, que es quien marca el ritmo. Nunca alimenta al bus del micrófono virtual: es una regla de diseño contra la
 /// realimentación, no una opción.
+/// <para>Cadena: suma de canales → volumen del bus (y silencio global) → limitador (−0,3 dBFS) → protección final.</para>
 /// </summary>
 internal sealed class MonitorBus
 {
     private readonly BusControl _control;
+    private readonly Func<bool> _isGlobalMuted;
     private readonly int _channelCount;
     private readonly SmoothedGain _gain = new(0f);
+    private readonly PeakLimiter _limiter;
     private readonly float[] _scratch;
-    private MixerChannel[] _channels = [];
+    private ChannelStrip[] _channels = [];
     private long _clippedSamples;
 
-    public MonitorBus(BusControl control, int channelCount)
+    public MonitorBus(BusControl control, AudioFormat format, Func<bool> isGlobalMuted)
     {
         _control = control;
-        _channelCount = channelCount;
-        _scratch = new float[MixerChannel.MaxBlockFrames * channelCount];
+        _isGlobalMuted = isGlobalMuted;
+        _channelCount = format.Channels;
+        _limiter = new PeakLimiter(format.SampleRate, format.Channels);
+        _scratch = new float[MixerChannel.MaxBlockFrames * format.Channels];
     }
 
     public PeakMeter OutputMeter { get; } = new();
+
+    public PeakLimiter Limiter => _limiter;
 
     public long ClippedSamples => Interlocked.Read(ref _clippedSamples);
 
@@ -32,9 +40,12 @@ internal sealed class MonitorBus
         get
         {
             long total = 0;
-            foreach (MixerChannel channel in Volatile.Read(ref _channels))
+            foreach (ChannelStrip channel in Volatile.Read(ref _channels))
             {
-                total += channel.MonitorReader.Resyncs;
+                if (channel is MixerChannel captured)
+                {
+                    total += captured.MonitorReader.Resyncs;
+                }
             }
 
             return total;
@@ -45,7 +56,7 @@ internal sealed class MonitorBus
     /// Sustituye la lista de canales. El hilo de render toma la lista una vez por bloque, así que añadir o quitar una
     /// fuente no detiene ni bloquea el audio de las demás.
     /// </summary>
-    public void SetChannels(MixerChannel[] channels) => Volatile.Write(ref _channels, channels);
+    public void SetChannels(ChannelStrip[] channels) => Volatile.Write(ref _channels, channels);
 
     /// <summary>Hilo de render. No asigna memoria, no bloquea y no lanza excepciones por datos de audio.</summary>
     public void Render(Span<float> output)
@@ -60,24 +71,28 @@ internal sealed class MonitorBus
     /// <summary>Solo con la salida parada.</summary>
     public void ResetForRestart()
     {
-        _gain.Target = _control.Linear;
+        _gain.Target = TargetGain();
         _gain.Snap();
-        foreach (MixerChannel channel in Volatile.Read(ref _channels))
+        _limiter.Reset();
+        foreach (ChannelStrip channel in Volatile.Read(ref _channels))
         {
             channel.ResetForRestart();
         }
     }
 
+    private float TargetGain() => _isGlobalMuted() ? 0f : _control.Linear;
+
     private void RenderChunk(Span<float> mix)
     {
         mix.Clear();
-        foreach (MixerChannel channel in Volatile.Read(ref _channels))
+        foreach (ChannelStrip channel in Volatile.Read(ref _channels))
         {
             channel.MixInto(mix, _scratch);
         }
 
-        _gain.Target = _control.Linear;
+        _gain.Target = TargetGain();
         _gain.Apply(mix, _channelCount);
+        _limiter.Process(mix);
 
         int clipped = SafetyClipper.Process(mix);
         if (clipped > 0)

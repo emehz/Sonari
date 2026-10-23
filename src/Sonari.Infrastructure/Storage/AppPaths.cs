@@ -20,6 +20,8 @@ public sealed class AppPaths
 
     public string SettingsFile => Path.Combine(ConfigDirectory, "settings.json");
 
+    public string SoundboardFile => Path.Combine(ConfigDirectory, "soundboard.json");
+
     public static AppPaths ForCurrentUser() => new(
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), AppFolderName),
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), AppFolderName, "logs"));

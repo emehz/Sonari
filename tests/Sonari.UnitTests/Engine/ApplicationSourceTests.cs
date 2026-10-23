@@ -30,7 +30,7 @@ public sealed class ApplicationSourceTests : IAsyncDisposable
         _processes.Launch(Browser, 100);
         ISourceChannel source = _engine.AddApplicationSource(new ApplicationTarget(Browser, "Navegador"));
         Assert.Equal(SourceStatus.Stopped, source.Status);
-        Assert.Equal([SourceKind.Microphone, SourceKind.Application], _engine.Sources.Select(s => s.Kind));
+        Assert.Equal([SourceKind.Microphone, SourceKind.SoundPlayer, SourceKind.Application], _engine.Sources.Select(s => s.Kind));
 
         await _engine.StartAsync(Options, TestContext.Current.CancellationToken);
 

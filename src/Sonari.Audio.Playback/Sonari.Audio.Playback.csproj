@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Decodificación de archivos de audio (Media Foundation vía NAudio) y caché de clips para el reproductor de sonidos. -->
+  <PropertyGroup>
+    <TargetFramework>$(SonariNet)-windows</TargetFramework>
+    <RootNamespace>Sonari.Audio.Playback</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio.Wasapi" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sonari.Audio.Core\Sonari.Audio.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,232 @@
+<UserControl x:Class="Sonari.Presentation.Views.SoundboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Sonari.Presentation.ViewModels"
+             xmlns:conv="clr-namespace:Sonari.Presentation.Converters"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:SoundboardViewModel}"
+             d:DesignWidth="940" d:DesignHeight="760">
+
+  <UserControl.Resources>
+    <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+    <Style x:Key="Button.Danger" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="#4A1D24" />
+      <Setter Property="BorderBrush" Value="{StaticResource Brush.Danger}" />
+      <Setter Property="Foreground" Value="#FFD5D5" />
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="Background" Value="#6A2530" />
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="Button.Round" TargetType="Button" BasedOn="{StaticResource Button.Accent}">
+      <Setter Property="Width" Value="34" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <Style x:Key="Button.Icon" TargetType="Button" BasedOn="{StaticResource Button.Ghost}">
+      <Setter Property="Padding" Value="7" />
+    </Style>
+  </UserControl.Resources>
+
+  <DockPanel Margin="32,28,32,24">
+
+    <!-- Cabecera con parada de emergencia -->
+    <DockPanel DockPanel.Dock="Top">
+      <Button DockPanel.Dock="Right" VerticalAlignment="Top" Style="{StaticResource Button.Danger}"
+              Command="{Binding StopAllCommand}" ToolTip="Corta todos los sonidos al instante"
+              AutomationProperties.Name="Detener todos los sonidos">
+        <StackPanel Orientation="Horizontal">
+          <TextBlock Text="&#xE71A;" FontFamily="{StaticResource Font.Icons}" FontSize="12" VerticalAlignment="Center" />
+          <TextBlock Text="Detener todo" Margin="8,0,0,0" FontWeight="SemiBold" />
+        </StackPanel>
+      </Button>
+      <StackPanel>
+        <TextBlock Text="{Binding Title}" Style="{StaticResource Text.PageTitle}" />
+        <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Text.PageSubtitle}" />
+      </StackPanel>
+    </DockPanel>
+
+    <!-- Avisos -->
+    <StackPanel DockPanel.Dock="Top">
+      <Border Style="{StaticResource Card.Warning}" Margin="0,16,0,0"
+              Visibility="{Binding EngineRunning, Converter={x:Static conv:VisibilityConverters.False}}">
+        <TextBlock Style="{StaticResource Text.Body}" Foreground="{StaticResource Brush.Warning}"
+                   Text="El motor está detenido: inícialo en el Mezclador para oír los sonidos." />
+      </Border>
+      <TextBlock Text="{Binding Message}" Style="{StaticResource Text.Caption}" Margin="0,10,0,0" TextTrimming="None"
+                 Visibility="{Binding Message, Converter={x:Static conv:VisibilityConverters.NotNull}}" />
+    </StackPanel>
+
+    <!-- Barra de herramientas: banco, categoría, importar y volumen general -->
+    <Border DockPanel.Dock="Top" Style="{StaticResource Card}" Margin="0,16,0,0">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Column="0">
+          <TextBlock Text="Banco" Style="{StaticResource Text.Caption}" Margin="0,0,0,4" />
+          <ComboBox ItemsSource="{Binding Banks}" SelectedItem="{Binding SelectedBank}" DisplayMemberPath="Name"
+                    Width="180" AutomationProperties.Name="Banco de sonidos" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Margin="10,0,0,0">
+          <TextBlock Text="Nombre del banco" Style="{StaticResource Text.Caption}" Margin="0,0,0,4" />
+          <TextBox Text="{Binding SelectedBank.Name, UpdateSourceTrigger=PropertyChanged}" Width="160" MinHeight="34"
+                   AutomationProperties.Name="Nombre del banco" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="6,0,0,0">
+          <Button Style="{StaticResource Button.Icon}" Command="{Binding AddBankCommand}" ToolTip="Nuevo banco">
+            <TextBlock Text="&#xE710;" Style="{StaticResource Text.Icon}" FontSize="14" />
+          </Button>
+          <Button Style="{StaticResource Button.Icon}" Command="{Binding RemoveBankCommand}" ToolTip="Quitar este banco">
+            <TextBlock Text="&#xE74D;" Style="{StaticResource Text.Icon}" FontSize="14" />
+          </Button>
+        </StackPanel>
+        <StackPanel Grid.Column="3" Margin="16,0,0,0" HorizontalAlignment="Left">
+          <TextBlock Text="Categoría" Style="{StaticResource Text.Caption}" Margin="0,0,0,4" />
+          <ComboBox ItemsSource="{Binding Categories}" SelectedItem="{Binding CategoryFilter}" Width="180"
+                    AutomationProperties.Name="Filtrar por categoría" />
+        </StackPanel>
+        <Button Grid.Column="4" VerticalAlignment="Bottom" Style="{StaticResource Button.Accent}"
+                Command="{Binding ImportSoundsCommand}">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xE8B5;" FontFamily="{StaticResource Font.Icons}" FontSize="12" VerticalAlignment="Center" />
+            <TextBlock Text="Importar sonidos" Margin="8,0,0,0" />
+          </StackPanel>
+        </Button>
+
+        <DockPanel Grid.Row="1" Grid.ColumnSpan="5" Margin="0,14,0,0">
+          <TextBlock DockPanel.Dock="Right" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" Margin="12,0,0,0">
+            <Run Text="{Binding ActiveVoices, Mode=OneWay}" /><Run Text=" sonando" />
+          </TextBlock>
+          <TextBlock DockPanel.Dock="Right" Text="{Binding MasterGainText}" Style="{StaticResource Text.Caption}"
+                     VerticalAlignment="Center" Width="60" TextAlignment="Right" />
+          <TextBlock DockPanel.Dock="Left" Text="Volumen de todos los sonidos" Style="{StaticResource Text.Caption}"
+                     VerticalAlignment="Center" Margin="0,0,12,0" />
+          <Slider Minimum="-60" Maximum="12" Value="{Binding MasterGainDb}" SmallChange="0.5" LargeChange="3"
+                  AutomationProperties.Name="Volumen de todos los sonidos" />
+        </DockPanel>
+      </Grid>
+    </Border>
+
+    <!-- Lista de sonidos -->
+    <Grid Margin="0,16,0,0">
+      <Border Style="{StaticResource Card}"
+              Visibility="{Binding VisibleSounds.Count, Converter={x:Static conv:VisibilityConverters.Zero}}">
+        <StackPanel HorizontalAlignment="Center" Margin="0,24">
+          <TextBlock Text="&#xE8D6;" Style="{StaticResource Text.Icon}" FontSize="28" HorizontalAlignment="Center" />
+          <TextBlock Text="No hay sonidos aquí" Style="{StaticResource Text.Section}" HorizontalAlignment="Center" Margin="0,12,0,0" />
+          <TextBlock Style="{StaticResource Text.Body}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,4,0,0">
+            <Run Text="Pulsa «Importar sonidos» para añadir archivos (" /><Run Text="{Binding SupportedFormatsText, Mode=OneWay}" /><Run Text=")." />
+          </TextBlock>
+        </StackPanel>
+      </Border>
+
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding VisibleSounds}" Focusable="False">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="{x:Type vm:SoundItemViewModel}">
+              <Border Background="{StaticResource Brush.Surface}" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1"
+                      CornerRadius="8" Padding="12,10" Margin="0,0,0,8">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+
+                  <!-- Transporte -->
+                  <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource Button.Round}" ToolTip="Reproducir (reinicia si ya suena)"
+                            AutomationProperties.Name="Reproducir sonido"
+                            Command="{Binding DataContext.PlayCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}">
+                      <TextBlock Text="{Binding PlayGlyph}" FontFamily="{StaticResource Font.Icons}" FontSize="13" />
+                    </Button>
+                    <Button Style="{StaticResource Button.Icon}" Margin="6,0,0,0" ToolTip="Pausar / reanudar"
+                            IsEnabled="{Binding IsActive}" AutomationProperties.Name="Pausar o reanudar"
+                            Command="{Binding DataContext.TogglePauseCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}">
+                      <TextBlock Text="&#xE769;" Style="{StaticResource Text.Icon}" FontSize="13" />
+                    </Button>
+                    <Button Style="{StaticResource Button.Icon}" ToolTip="Detener" IsEnabled="{Binding IsActive}"
+                            AutomationProperties.Name="Detener sonido"
+                            Command="{Binding DataContext.StopCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}">
+                      <TextBlock Text="&#xE71A;" Style="{StaticResource Text.Icon}" FontSize="13" />
+                    </Button>
+                  </StackPanel>
+
+                  <!-- Nombre, archivo, progreso y avisos -->
+                  <StackPanel Grid.Column="1" Margin="12,0,16,0" VerticalAlignment="Center">
+                    <DockPanel>
+                      <TextBox DockPanel.Dock="Right" Text="{Binding Category, UpdateSourceTrigger=LostFocus}" Width="120"
+                               ToolTip="Categoría (texto libre)" AutomationProperties.Name="Categoría" />
+                      <TextBox Text="{Binding Name, UpdateSourceTrigger=LostFocus}" Style="{StaticResource TextBox.Inline}"
+                               FontWeight="SemiBold" Margin="-4,0,8,0" AutomationProperties.Name="Nombre del sonido" />
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource Text.Caption}" Margin="0,3,0,0">
+                      <Run Text="{Binding FileName, Mode=OneWay}" /><Run Text="  ·  " /><Run Text="{Binding TimeText, Mode=OneWay}" />
+                    </TextBlock>
+                    <ProgressBar Value="{Binding Progress, Mode=OneWay}" Maximum="1" Height="3" Margin="0,6,0,0"
+                                 Background="{StaticResource Brush.SurfaceRaised}" />
+                    <ProgressBar IsIndeterminate="True" Margin="0,4,0,0"
+                                 Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text="No se encuentra el archivo. ¿Se movió o se borró?" Style="{StaticResource Text.Caption}"
+                               Foreground="{StaticResource Brush.Warning}" Margin="0,4,0,0"
+                               Visibility="{Binding IsMissing, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text="{Binding Error}" Style="{StaticResource Text.Caption}" Foreground="{StaticResource Brush.Danger}"
+                               Margin="0,4,0,0" TextWrapping="Wrap" TextTrimming="None"
+                               Visibility="{Binding Error, Converter={x:Static conv:VisibilityConverters.NotNull}}" />
+                  </StackPanel>
+
+                  <!-- Volumen, bucle y organización -->
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Width="130">
+                      <DockPanel>
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding GainText}" Style="{StaticResource Text.Caption}" />
+                        <TextBlock Text="Volumen" Style="{StaticResource Text.Caption}" />
+                      </DockPanel>
+                      <Slider Minimum="-60" Maximum="12" Value="{Binding GainDb}" SmallChange="0.5" LargeChange="3"
+                              AutomationProperties.Name="Volumen del sonido" />
+                    </StackPanel>
+                    <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding Loop}" Content="Bucle" Margin="16,0,8,0" />
+                    <Button Style="{StaticResource Button.Icon}" ToolTip="Subir"
+                            Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}">
+                      <TextBlock Text="&#xE70E;" Style="{StaticResource Text.Icon}" FontSize="12" />
+                    </Button>
+                    <Button Style="{StaticResource Button.Icon}" ToolTip="Bajar"
+                            Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}">
+                      <TextBlock Text="&#xE70D;" Style="{StaticResource Text.Icon}" FontSize="12" />
+                    </Button>
+                    <Button Style="{StaticResource Button.Icon}" ToolTip="Quitar del panel (el archivo no se borra)"
+                            Command="{Binding DataContext.RemoveSoundCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}">
+                      <TextBlock Text="&#xE711;" Style="{StaticResource Text.Icon}" FontSize="12" />
+                    </Button>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Grid>
+  </DockPanel>
+</UserControl>
