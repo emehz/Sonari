@@ -1,4 +1,4 @@
-namespace OndaMix.Audio.Devices;
+namespace Sonari.Audio.Devices;
 
 /// <summary>
 /// Reconoce por nombre los cables y micrófonos virtuales más comunes. Sirve para orientar al usuario

@@ -2,11 +2,11 @@ using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
-using OndaMix.Audio.Core.Endpoints;
-using OndaMix.Audio.Core.Formats;
-using OndaMix.Audio.Devices;
+using Sonari.Audio.Core.Endpoints;
+using Sonari.Audio.Core.Formats;
+using Sonari.Audio.Devices;
 
-namespace OndaMix.Audio.Capture;
+namespace Sonari.Audio.Capture;
 
 /// <summary>
 /// Abre micrófonos en modo compartido, por eventos y con prioridad MMCSS «Pro Audio». Se pide directamente el formato

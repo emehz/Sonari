@@ -6,13 +6,13 @@
 
 | Proyecto | Contenido |
 |---|---|
-| `OndaMix.Audio.Core` | Contratos `IAudioStream`, `ICaptureStreamFactory`, `IRenderStreamFactory`, `IAudioDeviceWatcher` e `IAudioEngine`, más los tipos de estado y métricas |
-| `OndaMix.Audio.Engine` *(nuevo; sustituye al «Audio.Mixing» del diseño)* | `DriftCompensatingReader`, `MixerChannel`, `MonitorBus`, `SmoothedGain`, `PeakMeter`, `SafetyClipper` y el supervisor `AudioEngine`. No usa NAudio, así que se prueba con dispositivos simulados |
-| `OndaMix.Audio.Capture` *(nuevo)* | `WasapiCaptureStreamFactory`: micrófono en modo compartido, por eventos, con MMCSS «Pro Audio» |
-| `OndaMix.Audio.Output` *(nuevo)* | `WasapiRenderStreamFactory`: salida en modo compartido, por eventos, con MMCSS |
-| `OndaMix.Audio.Devices` | `WasapiDeviceWatcher` (avisos de conexión y desconexión) y `WasapiEndpointResolver` |
-| `OndaMix.Presentation` | Página **Mezclador** (canal de micrófono, bus de monitoreo y diagnóstico), control `LevelMeter` y estilos de Slider e interruptor |
-| `OndaMix.App` | Registro del motor y `AudioEngineLifetime`, que libera los dispositivos al cerrar la aplicación |
+| `Sonari.Audio.Core` | Contratos `IAudioStream`, `ICaptureStreamFactory`, `IRenderStreamFactory`, `IAudioDeviceWatcher` e `IAudioEngine`, más los tipos de estado y métricas |
+| `Sonari.Audio.Engine` *(nuevo; sustituye al «Audio.Mixing» del diseño)* | `DriftCompensatingReader`, `MixerChannel`, `MonitorBus`, `SmoothedGain`, `PeakMeter`, `SafetyClipper` y el supervisor `AudioEngine`. No usa NAudio, así que se prueba con dispositivos simulados |
+| `Sonari.Audio.Capture` *(nuevo)* | `WasapiCaptureStreamFactory`: micrófono en modo compartido, por eventos, con MMCSS «Pro Audio» |
+| `Sonari.Audio.Output` *(nuevo)* | `WasapiRenderStreamFactory`: salida en modo compartido, por eventos, con MMCSS |
+| `Sonari.Audio.Devices` | `WasapiDeviceWatcher` (avisos de conexión y desconexión) y `WasapiEndpointResolver` |
+| `Sonari.Presentation` | Página **Mezclador** (canal de micrófono, bus de monitoreo y diagnóstico), control `LevelMeter` y estilos de Slider e interruptor |
+| `Sonari.App` | Registro del motor y `AudioEngineLifetime`, que libera los dispositivos al cerrar la aplicación |
 | raíz | `global.json`: `dotnet test` usa Microsoft.Testing.Platform, obligatorio con xUnit v3 en el SDK de .NET 10 |
 
 ## Decisiones técnicas

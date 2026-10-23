@@ -2,8 +2,8 @@
 
   <!-- Salidas sobre WASAPI: monitoreo por auriculares (Fase 2) y bus del micrófono virtual (Fase 5). -->
   <PropertyGroup>
-    <TargetFramework>$(OndaNet)-windows</TargetFramework>
-    <RootNamespace>OndaMix.Audio.Output</RootNamespace>
+    <TargetFramework>$(SonariNet)-windows</TargetFramework>
+    <RootNamespace>Sonari.Audio.Output</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,8 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OndaMix.Audio.Core\OndaMix.Audio.Core.csproj" />
-    <ProjectReference Include="..\OndaMix.Audio.Devices\OndaMix.Audio.Devices.csproj" />
+    <ProjectReference Include="..\Sonari.Audio.Core\Sonari.Audio.Core.csproj" />
+    <ProjectReference Include="..\Sonari.Audio.Devices\Sonari.Audio.Devices.csproj" />
   </ItemGroup>
 
 </Project>

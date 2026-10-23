@@ -5,25 +5,25 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OndaMix.Audio.Core", "src\OndaMix.Audio.Core\OndaMix.Audio.Core.csproj", "{69E1CD01-1585-426D-9C69-0D106F9C938B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sonari.Audio.Core", "src\Sonari.Audio.Core\Sonari.Audio.Core.csproj", "{69E1CD01-1585-426D-9C69-0D106F9C938B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OndaMix.Audio.Devices", "src\OndaMix.Audio.Devices\OndaMix.Audio.Devices.csproj", "{6F36978C-000D-4061-96BC-06C9CBAC6619}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sonari.Audio.Devices", "src\Sonari.Audio.Devices\Sonari.Audio.Devices.csproj", "{6F36978C-000D-4061-96BC-06C9CBAC6619}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OndaMix.Infrastructure", "src\OndaMix.Infrastructure\OndaMix.Infrastructure.csproj", "{42013CC7-0343-4821-8345-60E901814C76}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sonari.Infrastructure", "src\Sonari.Infrastructure\Sonari.Infrastructure.csproj", "{42013CC7-0343-4821-8345-60E901814C76}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OndaMix.Presentation", "src\OndaMix.Presentation\OndaMix.Presentation.csproj", "{AC84CF0F-194B-4E87-8754-AC16165CAA16}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sonari.Presentation", "src\Sonari.Presentation\Sonari.Presentation.csproj", "{AC84CF0F-194B-4E87-8754-AC16165CAA16}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OndaMix.App", "src\OndaMix.App\OndaMix.App.csproj", "{49472D5C-B11F-405D-945C-E1886D4D7FC7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sonari.App", "src\Sonari.App\Sonari.App.csproj", "{49472D5C-B11F-405D-945C-E1886D4D7FC7}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OndaMix.UnitTests", "tests\OndaMix.UnitTests\OndaMix.UnitTests.csproj", "{547F2B27-EF63-4214-8C2B-100091C29A10}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sonari.UnitTests", "tests\Sonari.UnitTests\Sonari.UnitTests.csproj", "{547F2B27-EF63-4214-8C2B-100091C29A10}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OndaMix.Audio.Engine", "src\OndaMix.Audio.Engine\OndaMix.Audio.Engine.csproj", "{B0D22597-80F7-4A64-8A8E-554C8A119C5F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sonari.Audio.Engine", "src\Sonari.Audio.Engine\Sonari.Audio.Engine.csproj", "{B0D22597-80F7-4A64-8A8E-554C8A119C5F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OndaMix.Audio.Capture", "src\OndaMix.Audio.Capture\OndaMix.Audio.Capture.csproj", "{A215D86D-E47A-4B9D-86C6-59066030DC8D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sonari.Audio.Capture", "src\Sonari.Audio.Capture\Sonari.Audio.Capture.csproj", "{A215D86D-E47A-4B9D-86C6-59066030DC8D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OndaMix.Audio.Output", "src\OndaMix.Audio.Output\OndaMix.Audio.Output.csproj", "{43898F7E-CB99-4B56-B326-A99287628CA5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sonari.Audio.Output", "src\Sonari.Audio.Output\Sonari.Audio.Output.csproj", "{43898F7E-CB99-4B56-B326-A99287628CA5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

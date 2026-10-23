@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging;
 using NAudio.CoreAudioApi;
-using OndaMix.Audio.Core.Devices;
-using OndaMix.Audio.Core.Endpoints;
+using Sonari.Audio.Core.Devices;
+using Sonari.Audio.Core.Endpoints;
 
-namespace OndaMix.Audio.Devices;
+namespace Sonari.Audio.Devices;
 
 /// <summary>
 /// Traduce las notificaciones de endpoints de Windows a <see cref="EndpointChange"/>. Los eventos llegan en un hilo

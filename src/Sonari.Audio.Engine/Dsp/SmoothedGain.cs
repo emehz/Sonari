@@ -1,4 +1,4 @@
-namespace OndaMix.Audio.Engine.Dsp;
+namespace Sonari.Audio.Engine.Dsp;
 
 /// <summary>
 /// Ganancia que pasa del valor actual al objetivo con una rampa lineal a lo largo de un bloque, para que mover un

@@ -5,8 +5,8 @@
     No conoce NAudio ni Windows: trabaja contra las interfaces de Audio.Core, así que se prueba con dispositivos simulados.
   -->
   <PropertyGroup>
-    <TargetFramework>$(OndaNet)</TargetFramework>
-    <RootNamespace>OndaMix.Audio.Engine</RootNamespace>
+    <TargetFramework>$(SonariNet)</TargetFramework>
+    <RootNamespace>Sonari.Audio.Engine</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,11 +14,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OndaMix.Audio.Core\OndaMix.Audio.Core.csproj" />
+    <ProjectReference Include="..\Sonari.Audio.Core\Sonari.Audio.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="OndaMix.UnitTests" />
+    <InternalsVisibleTo Include="Sonari.UnitTests" />
   </ItemGroup>
 
 </Project>

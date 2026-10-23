@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using NAudio.CoreAudioApi;
-using OndaMix.Audio.Core.Devices;
+using Sonari.Audio.Core.Devices;
 
-namespace OndaMix.Audio.Devices;
+namespace Sonari.Audio.Devices;
 
 /// <summary>
 /// Enumera endpoints con la API MMDevice de Windows (vía NAudio). Cada llamada crea y libera su propio enumerador

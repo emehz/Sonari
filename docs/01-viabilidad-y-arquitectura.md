@@ -1,6 +1,6 @@
-# OndaMix — Fase 0: viabilidad, arquitectura y plan
+# Sonari — Fase 0: viabilidad, arquitectura y plan
 
-> «OndaMix» es un nombre en clave. Cambiarlo es barato mientras el proyecto esté en la Fase 1 y caro después.
+> El proyecto empezó con el nombre en clave «OndaMix» y pasó a llamarse **Sonari** tras la Fase 2.
 > Fecha de la investigación: 22/10/2026. Las versiones citadas se comprobaron ese día en NuGet y en Microsoft Learn.
 
 ---
@@ -84,14 +84,14 @@ Cambios de parámetros: valores `volatile float` con rampa por muestra. Cambios 
 |---|---|---|---|---|---|
 | **VB-CABLE** (VB-Audio) | ― | Instalador oficial (admin) | Cada usuario lo descarga de vb-audio.com. Es *donationware* y no puede incluirse en nuestro instalador sin acuerdo con VB-Audio (más de 10 unidades) | Baja, configurable en su panel | No («CABLE Output»), aunque Windows permite renombrar el endpoint |
 | **Virtual-Audio-Driver** (VirtualDrivers, MIT + MS-PL, derivado de SYSVAD) | C/C++ | Manual y en **beta**, requiere *test signing* | No es apto para usuarios finales hoy | Sin medir | Sí, compilándolo nosotros |
-| **Driver propio derivado de SYSVAD** (PortCls/WaveRT) | C/C++ con WDK | INF + `pnputil` (admin) | Sí, **con attestation signing** (Partner Center + certificado EV) | La más baja posible | Sí: «OndaMix Virtual Microphone» |
+| **Driver propio derivado de SYSVAD** (PortCls/WaveRT) | C/C++ con WDK | INF + `pnputil` (admin) | Sí, **con attestation signing** (Partner Center + certificado EV) | La más baja posible | Sí: «Sonari Virtual Microphone» |
 | **Driver propio ACX** | C/C++ con WDK | Igual que el anterior | Igual que el anterior | Igual | Sí |
 
 ### C.3 Decisión
 
 1. **Fases 1 a 5 (desarrollo y uso entre amigos):** la salida va a un **cable virtual existente**. El motor renderiza en «CABLE Input» y Discord o el juego seleccionan «CABLE Output» como micrófono. La interfaz `IVirtualMicrophoneSink` y una implementación `CableEndpointSink` (cualquier par render/captura) hacen la sustitución transparente. La aplicación **detecta** el cable y lo muestra como «cable virtual de terceros»: nunca dice que es nuestro micrófono.
 2. **Subproyecto `driver/` (C++, después de la Fase 5):** un driver propio basado en el sample **SYSVAD** de Microsoft (o un fork de Virtual-Audio-Driver tras auditarlo), en dos pasos:
-   * **Paso 1, par en bucle:** un endpoint de render oculto o discreto y un endpoint de captura «OndaMix Virtual Microphone». Es el mismo modelo que un cable, de modo que el motor no cambia.
+   * **Paso 1, par en bucle:** un endpoint de render oculto o discreto y un endpoint de captura «Sonari Virtual Microphone». Es el mismo modelo que un cable, de modo que el motor no cambia.
    * **Paso 2, ruta directa:** solo un endpoint de captura, alimentado por un buffer compartido entre el motor y el driver mediante IOCTL. Da menos latencia y oculta el endpoint de render, pero es más complejo y exige validar ACL y entradas en el kernel.
    * Se elige PortCls/WaveRT frente a ACX porque SYSVAD es el sample de referencia más maduro y cubre Windows 10 y 11. ACX 1.1 figura en la documentación con soporte desde Windows 10 2004, pero hay menos ejemplos. La decisión se revisará al empezar el driver.
 
@@ -100,7 +100,7 @@ Cambios de parámetros: valores `volatile float` con rampa por muestra. Cambios 
 * **Desarrollo:** *test signing* (`bcdedit /set testsigning on`, con Secure Boot desactivado) y un certificado de prueba propio. **Nunca** debe pedírsele a un amigo que desactive Secure Boot.
 * **Distribución:** desde Windows 10 1607, con Secure Boot, un driver de kernel nuevo debe estar firmado por Microsoft. Para el *attestation signing* hace falta una cuenta de Hardware Dev Center en Partner Center con **al menos un certificado EV** asociado y archivos firmados con SHA-256. El attestation signing solo vale para Windows 10/11 de escritorio y no sirve para publicar en Windows Update para usuarios minoristas (eso requiere las pruebas HLK y WHCP completas).
 * **Compatibilidad:** x64 (y ARM64 compilado aparte), compatible con HVCI (integridad de memoria), sin APIs de kernel obsoletas.
-* **Instalación:** requiere administrador (`pnputil /add-driver ondamix.inf /install`, o crear un dispositivo raíz con `devcon`/SwDevice). La aplicación **no** necesita administrador; solo el instalador del driver.
+* **Instalación:** requiere administrador (`pnputil /add-driver sonari.inf /install`, o crear un dispositivo raíz con `devcon`/SwDevice). La aplicación **no** necesita administrador; solo el instalador del driver.
 * **Requisitos de desarrollo:** la carga de trabajo «Desarrollo para el escritorio con C++» de Visual Studio, el Windows SDK y el WDK de la misma versión. Hoy no tienes ninguno instalado: no hace falta hasta el subproyecto del driver.
 
 ---
@@ -207,7 +207,7 @@ flowchart LR
         CH1 & CH2 & CH3 & CH4 & CH5 -->|envío M · ring SPSC| BM[Bus Monitor<br/>ganancia · limitador]
     end
 
-    BV --> VS[IVirtualMicrophoneSink<br/>Fase 5: CABLE Input → futuro driver OndaMix]
+    BV --> VS[IVirtualMicrophoneSink<br/>Fase 5: CABLE Input → futuro driver Sonari]
     BM --> HP[Auriculares<br/>WasapiPlayer]
     VS -.->|endpoint de captura| DISC[Discord · juegos · OBS]
 
@@ -239,26 +239,26 @@ Reglas del diagrama:
 ## G. Estructura de la solución
 
 ```
-OndaMix/
-├─ OndaMix.sln
+Sonari/
+├─ Sonari.sln
 ├─ Directory.Build.props          # TFM común, nullable, versión
 ├─ Directory.Packages.props       # versiones centralizadas de NuGet
 ├─ .editorconfig  .gitignore  .gitattributes  README.md
 ├─ docs/
 ├─ src/
-│  ├─ OndaMix.App/                # exe WPF: composición (Host), arranque, instancia única
-│  ├─ OndaMix.Presentation/       # Vistas XAML, ViewModels, tema, controles
-│  ├─ OndaMix.Audio.Core/         # Contratos, formatos, ring buffers, dB (sin dependencias)
-│  ├─ OndaMix.Audio.Devices/      # Endpoints WASAPI (NAudio): enumeración, capacidades, notificaciones
-│  ├─ OndaMix.Infrastructure/     # JSON, rutas, ajustes
-│  ├─ OndaMix.Audio.Capture/      # Fase 2–3: micrófono, sistema, por proceso
-│  ├─ OndaMix.Audio.Engine/       # Fase 2+: canales, buses, deriva, DSP básico y supervisor (sin NAudio)
-│  ├─ OndaMix.Audio.Playback/     # Fase 4: reproductor de sonidos
-│  ├─ OndaMix.Audio.Output/       # Fase 2: render de monitoreo y del bus virtual
-│  ├─ OndaMix.VirtualAudio/       # Fase 5: IVirtualMicrophoneSink, detección de cable y driver
-│  └─ OndaMix.Audio.Effects/      # Fase 6: DSP
+│  ├─ Sonari.App/                # exe WPF: composición (Host), arranque, instancia única
+│  ├─ Sonari.Presentation/       # Vistas XAML, ViewModels, tema, controles
+│  ├─ Sonari.Audio.Core/         # Contratos, formatos, ring buffers, dB (sin dependencias)
+│  ├─ Sonari.Audio.Devices/      # Endpoints WASAPI (NAudio): enumeración, capacidades, notificaciones
+│  ├─ Sonari.Infrastructure/     # JSON, rutas, ajustes
+│  ├─ Sonari.Audio.Capture/      # Fase 2–3: micrófono, sistema, por proceso
+│  ├─ Sonari.Audio.Engine/       # Fase 2+: canales, buses, deriva, DSP básico y supervisor (sin NAudio)
+│  ├─ Sonari.Audio.Playback/     # Fase 4: reproductor de sonidos
+│  ├─ Sonari.Audio.Output/       # Fase 2: render de monitoreo y del bus virtual
+│  ├─ Sonari.VirtualAudio/       # Fase 5: IVirtualMicrophoneSink, detección de cable y driver
+│  └─ Sonari.Audio.Effects/      # Fase 6: DSP
 ├─ tests/
-│  └─ OndaMix.UnitTests/          # Pruebas sin hardware (se dividirá cuando crezca)
+│  └─ Sonari.UnitTests/          # Pruebas sin hardware (se dividirá cuando crezca)
 └─ driver/                        # Subproyecto C++/WDK posterior a la Fase 5
 ```
 
@@ -288,7 +288,7 @@ Dependencias permitidas:
 | **7. Escenas y atajos** | Escenas en JSON, `RegisterHotKey`, conflictos | 5 escenas persisten tras reiniciar. Cambiar de escena no reinicia los dispositivos. Un atajo ocupado se informa |
 | **8. Robustez** | Pruebas de latencia en bucle, CPU, memoria, GC, desconexiones y estrés | 1 hora con 6 fuentes: memoria estable, ≤ 5 % de CPU en un equipo medio y 0 underruns sin causa externa |
 | **9. Distribución** | Instalador, primer arranque guiado, paquete de diagnóstico y documentación para el usuario | Un amigo instala la app y el cable siguiendo la guía, sin ayuda |
-| **Driver** (paralelo, tras la 5) | Driver SYSVAD propio, primero con test signing y después con attestation | El endpoint «OndaMix Virtual Microphone» recibe la mezcla en una máquina de pruebas |
+| **Driver** (paralelo, tras la 5) | Driver SYSVAD propio, primero con test signing y después con attestation | El endpoint «Sonari Virtual Microphone» recibe la mezcla en una máquina de pruebas |
 
 ### Plan de pruebas
 
@@ -309,8 +309,8 @@ Dependencias permitidas:
 
 1. Instala **Visual Studio 2026 Community** con la carga de trabajo **«Desarrollo de escritorio de .NET»**, que incluye el SDK de .NET 10. Puede convivir con VS 2022.
 2. Comprueba el SDK en una terminal: `dotnet --list-sdks` debe mostrar una línea `10.0.x`.
-3. Abre `OndaMix.sln` en VS 2026.
-4. Haz clic derecho en `OndaMix.App` → **Establecer como proyecto de inicio**.
+3. Abre `Sonari.sln` en VS 2026.
+4. Haz clic derecho en `Sonari.App` → **Establecer como proyecto de inicio**.
 5. Ejecuta **Compilar → Recompilar solución** y espera **0 errores**.
 6. Pulsa **F5**.
 7. Abre **Prueba → Explorador de pruebas → Ejecutar todas**.
@@ -318,14 +318,14 @@ Dependencias permitidas:
 Desde la línea de comandos, en la carpeta de la solución:
 
 ```
-dotnet build OndaMix.sln -c Debug
-dotnet test OndaMix.sln
-dotnet run --project src/OndaMix.App
+dotnet build Sonari.sln -c Debug
+dotnet test Sonari.sln
+dotnet run --project src/Sonari.App
 ```
 
-**Clona el repositorio en una ruta corta** (p. ej. `C:\dev\OndaMix`). Se comprobó en la Fase 1 que, con rutas de más de 260 caracteres, el compilador XAML de WPF omite las vistas sin dar error de compilación, y la app falla al arrancar con *«No se encuentra el recurso 'views/mainwindow.xaml'»*.
+**Clona el repositorio en una ruta corta** (p. ej. `C:\dev\Sonari`). Se comprobó en la Fase 1 que, con rutas de más de 260 caracteres, el compilador XAML de WPF omite las vistas sin dar error de compilación, y la app falla al arrancar con *«No se encuentra el recurso 'views/mainwindow.xaml'»*.
 
-**Si de momento debes usar VS 2022:** cambia `OndaNet` a `net9.0` en `Directory.Build.props`. Compila igual, pero .NET 9 se queda sin soporte el 10/11/2026: tómalo solo como un puente temporal.
+**Si de momento debes usar VS 2022:** cambia `SonariNet` a `net9.0` en `Directory.Build.props`. Compila igual, pero .NET 9 se queda sin soporte el 10/11/2026: tómalo solo como un puente temporal.
 
 ---
 

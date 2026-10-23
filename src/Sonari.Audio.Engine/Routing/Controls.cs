@@ -1,7 +1,7 @@
-using OndaMix.Audio.Core.Engine;
-using OndaMix.Audio.Core.Formats;
+using Sonari.Audio.Core.Engine;
+using Sonari.Audio.Core.Formats;
 
-namespace OndaMix.Audio.Engine.Routing;
+namespace Sonari.Audio.Engine.Routing;
 
 /// <summary>Valores de un canal escritos por la UI y leídos por el hilo de audio una vez por bloque.</summary>
 internal sealed class ChannelControl : IChannelControl

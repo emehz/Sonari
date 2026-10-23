@@ -1,4 +1,4 @@
-namespace OndaMix.Audio.Engine.Dsp;
+namespace Sonari.Audio.Engine.Dsp;
 
 /// <summary>
 /// Última protección antes del dispositivo: recorta a [-1, 1] y sustituye NaN/infinito por silencio.

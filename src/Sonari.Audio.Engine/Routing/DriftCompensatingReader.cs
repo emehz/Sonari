@@ -1,6 +1,6 @@
-using OndaMix.Audio.Core.Buffers;
+using Sonari.Audio.Core.Buffers;
 
-namespace OndaMix.Audio.Engine.Routing;
+namespace Sonari.Audio.Engine.Routing;
 
 /// <summary>
 /// Consumidor de un <see cref="SpscRingBuffer{T}"/> alimentado por un dispositivo con otro reloj.

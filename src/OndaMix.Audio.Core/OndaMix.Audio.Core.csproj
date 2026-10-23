@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <!-- Contratos y primitivas del motor. Sin dependencias externas ni APIs de Windows. -->
-  <PropertyGroup>
-    <TargetFramework>$(OndaNet)</TargetFramework>
-    <RootNamespace>OndaMix.Audio.Core</RootNamespace>
-  </PropertyGroup>
-
-</Project>

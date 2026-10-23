@@ -3,10 +3,10 @@
   <!-- Ejecutable WPF y raíz de composición: el único proyecto que conoce todas las implementaciones. -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>$(OndaNet)-windows</TargetFramework>
+    <TargetFramework>$(SonariNet)-windows</TargetFramework>
     <UseWPF>true</UseWPF>
-    <RootNamespace>OndaMix.App</RootNamespace>
-    <AssemblyName>OndaMix</AssemblyName>
+    <RootNamespace>Sonari.App</RootNamespace>
+    <AssemblyName>Sonari</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
@@ -17,13 +17,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OndaMix.Audio.Core\OndaMix.Audio.Core.csproj" />
-    <ProjectReference Include="..\OndaMix.Audio.Capture\OndaMix.Audio.Capture.csproj" />
-    <ProjectReference Include="..\OndaMix.Audio.Devices\OndaMix.Audio.Devices.csproj" />
-    <ProjectReference Include="..\OndaMix.Audio.Engine\OndaMix.Audio.Engine.csproj" />
-    <ProjectReference Include="..\OndaMix.Audio.Output\OndaMix.Audio.Output.csproj" />
-    <ProjectReference Include="..\OndaMix.Infrastructure\OndaMix.Infrastructure.csproj" />
-    <ProjectReference Include="..\OndaMix.Presentation\OndaMix.Presentation.csproj" />
+    <ProjectReference Include="..\Sonari.Audio.Core\Sonari.Audio.Core.csproj" />
+    <ProjectReference Include="..\Sonari.Audio.Capture\Sonari.Audio.Capture.csproj" />
+    <ProjectReference Include="..\Sonari.Audio.Devices\Sonari.Audio.Devices.csproj" />
+    <ProjectReference Include="..\Sonari.Audio.Engine\Sonari.Audio.Engine.csproj" />
+    <ProjectReference Include="..\Sonari.Audio.Output\Sonari.Audio.Output.csproj" />
+    <ProjectReference Include="..\Sonari.Infrastructure\Sonari.Infrastructure.csproj" />
+    <ProjectReference Include="..\Sonari.Presentation\Sonari.Presentation.csproj" />
   </ItemGroup>
 
 </Project>

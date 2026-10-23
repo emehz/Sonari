@@ -2,8 +2,8 @@
 
   <!-- Capa de endpoints WASAPI compartida por Capture, Output y VirtualAudio. Única capa (junto con ellas) que conoce NAudio. -->
   <PropertyGroup>
-    <TargetFramework>$(OndaNet)-windows</TargetFramework>
-    <RootNamespace>OndaMix.Audio.Devices</RootNamespace>
+    <TargetFramework>$(SonariNet)-windows</TargetFramework>
+    <RootNamespace>Sonari.Audio.Devices</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OndaMix.Audio.Core\OndaMix.Audio.Core.csproj" />
+    <ProjectReference Include="..\Sonari.Audio.Core\Sonari.Audio.Core.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,11 +1,11 @@
 using System.Runtime;
 using Microsoft.Extensions.Logging;
-using OndaMix.Audio.Core.Devices;
-using OndaMix.Audio.Core.Endpoints;
-using OndaMix.Audio.Core.Engine;
-using OndaMix.Audio.Engine.Routing;
+using Sonari.Audio.Core.Devices;
+using Sonari.Audio.Core.Endpoints;
+using Sonari.Audio.Core.Engine;
+using Sonari.Audio.Engine.Routing;
 
-namespace OndaMix.Audio.Engine;
+namespace Sonari.Audio.Engine;
 
 /// <summary>
 /// Motor de audio de la Fase 2: micrófono → compensación de deriva → bus de monitoreo → auriculares.

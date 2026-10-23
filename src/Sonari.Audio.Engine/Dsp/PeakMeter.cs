@@ -1,6 +1,6 @@
-using OndaMix.Audio.Core.Engine;
+using Sonari.Audio.Core.Engine;
 
-namespace OndaMix.Audio.Engine.Dsp;
+namespace Sonari.Audio.Engine.Dsp;
 
 /// <summary>
 /// Medidor de pico estéreo sin bloqueos. El hilo de audio acumula el máximo de cada bloque y la UI lo lee y

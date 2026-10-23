@@ -1,8 +1,8 @@
-using OndaMix.Audio.Core.Buffers;
-using OndaMix.Audio.Core.Formats;
-using OndaMix.Audio.Engine.Dsp;
+using Sonari.Audio.Core.Buffers;
+using Sonari.Audio.Core.Formats;
+using Sonari.Audio.Engine.Dsp;
 
-namespace OndaMix.Audio.Engine.Routing;
+namespace Sonari.Audio.Engine.Routing;
 
 /// <summary>
 /// Una fuente dentro del motor: el hilo de captura escribe en el ring buffer (<see cref="OnCaptured"/>) y el hilo de

@@ -4,16 +4,16 @@
       Framework base de toda la solución. .NET 10 es la LTS vigente y requiere Visual Studio 2026 (18.x).
       Puente temporal para Visual Studio 2022: cambia a net9.0 (sin soporte desde el 10/11/2026).
     -->
-    <OndaNet Condition="'$(OndaNet)' == ''">net10.0</OndaNet>
+    <SonariNet Condition="'$(SonariNet)' == ''">net10.0</SonariNet>
 
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <SatelliteResourceLanguages>es;en</SatelliteResourceLanguages>
 
-    <Product>OndaMix</Product>
-    <Company>OndaMix</Company>
+    <Product>Sonari</Product>
+    <Company>Sonari</Company>
     <Version>0.1.0</Version>
-    <Copyright>© 2026 OndaMix contributors</Copyright>
+    <Copyright>© 2026 Sonari contributors</Copyright>
   </PropertyGroup>
 </Project>

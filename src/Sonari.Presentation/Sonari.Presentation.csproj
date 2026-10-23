@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Vistas WPF, ViewModels y tema. No conoce NAudio ni el motor concreto: solo contratos de Core e Infrastructure. -->
+  <PropertyGroup>
+    <TargetFramework>$(SonariNet)-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Sonari.Presentation</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sonari.Audio.Core\Sonari.Audio.Core.csproj" />
+    <ProjectReference Include="..\Sonari.Infrastructure\Sonari.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

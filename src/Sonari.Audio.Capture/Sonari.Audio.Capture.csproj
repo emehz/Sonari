@@ -2,8 +2,8 @@
 
   <!-- Fuentes de captura sobre WASAPI: micrófono (Fase 2), sistema y aplicaciones (Fase 3). -->
   <PropertyGroup>
-    <TargetFramework>$(OndaNet)-windows</TargetFramework>
-    <RootNamespace>OndaMix.Audio.Capture</RootNamespace>
+    <TargetFramework>$(SonariNet)-windows</TargetFramework>
+    <RootNamespace>Sonari.Audio.Capture</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,8 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OndaMix.Audio.Core\OndaMix.Audio.Core.csproj" />
-    <ProjectReference Include="..\OndaMix.Audio.Devices\OndaMix.Audio.Devices.csproj" />
+    <ProjectReference Include="..\Sonari.Audio.Core\Sonari.Audio.Core.csproj" />
+    <ProjectReference Include="..\Sonari.Audio.Devices\Sonari.Audio.Devices.csproj" />
   </ItemGroup>
 
 </Project>

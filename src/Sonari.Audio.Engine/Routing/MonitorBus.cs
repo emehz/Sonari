@@ -1,6 +1,6 @@
-using OndaMix.Audio.Engine.Dsp;
+using Sonari.Audio.Engine.Dsp;
 
-namespace OndaMix.Audio.Engine.Routing;
+namespace Sonari.Audio.Engine.Routing;
 
 /// <summary>
 /// Bus de monitoreo (lo que oyes por los auriculares). Su <see cref="Render"/> lo llama el hilo del dispositivo de

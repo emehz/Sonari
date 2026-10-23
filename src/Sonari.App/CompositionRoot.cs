@@ -1,21 +1,21 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OndaMix.Audio.Capture;
-using OndaMix.Audio.Core.Devices;
-using OndaMix.Audio.Core.Endpoints;
-using OndaMix.Audio.Core.Engine;
-using OndaMix.Audio.Devices;
-using OndaMix.Audio.Engine;
-using OndaMix.Audio.Output;
-using OndaMix.Infrastructure.Settings;
-using OndaMix.Infrastructure.Storage;
-using OndaMix.Presentation.Services;
-using OndaMix.Presentation.ViewModels;
-using OndaMix.Presentation.Views;
+using Sonari.Audio.Capture;
+using Sonari.Audio.Core.Devices;
+using Sonari.Audio.Core.Endpoints;
+using Sonari.Audio.Core.Engine;
+using Sonari.Audio.Devices;
+using Sonari.Audio.Engine;
+using Sonari.Audio.Output;
+using Sonari.Infrastructure.Settings;
+using Sonari.Infrastructure.Storage;
+using Sonari.Presentation.Services;
+using Sonari.Presentation.ViewModels;
+using Sonari.Presentation.Views;
 using Serilog;
 
-namespace OndaMix.App;
+namespace Sonari.App;
 
 /// <summary>Registro de todos los servicios. Es el único lugar que une interfaces con implementaciones.</summary>
 internal static class CompositionRoot
@@ -25,7 +25,7 @@ internal static class CompositionRoot
         HostApplicationBuilder builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
         {
             Args = args,
-            ApplicationName = "OndaMix",
+            ApplicationName = "Sonari",
             ContentRootPath = AppContext.BaseDirectory,
         });
 

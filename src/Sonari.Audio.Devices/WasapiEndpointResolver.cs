@@ -1,8 +1,8 @@
 using System.Runtime.InteropServices;
 using NAudio.CoreAudioApi;
-using OndaMix.Audio.Core.Endpoints;
+using Sonari.Audio.Core.Endpoints;
 
-namespace OndaMix.Audio.Devices;
+namespace Sonari.Audio.Devices;
 
 /// <summary>Traduce un id de endpoint (o <c>null</c> = predeterminado) a un MMDevice activo, con errores comprensibles.</summary>
 public static class WasapiEndpointResolver

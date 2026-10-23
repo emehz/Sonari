@@ -4,17 +4,17 @@ using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using OndaMix.Infrastructure.Storage;
-using OndaMix.Presentation.Views;
+using Sonari.Infrastructure.Storage;
+using Sonari.Presentation.Views;
 using Serilog;
 using Serilog.Events;
 
-namespace OndaMix.App;
+namespace Sonari.App;
 
 public partial class App : Application
 {
-    // "Local\" limita la exclusión a la sesión del usuario: dos usuarios con sesión abierta pueden usar OndaMix a la vez.
-    private const string SingleInstanceMutexName = @"Local\OndaMix.SingleInstance";
+    // "Local\" limita la exclusión a la sesión del usuario: dos usuarios con sesión abierta pueden usar Sonari a la vez.
+    private const string SingleInstanceMutexName = @"Local\Sonari.SingleInstance";
 
     private Mutex? _singleInstanceMutex;
     private IHost? _host;
@@ -27,7 +27,7 @@ public partial class App : Application
         _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out bool createdNew);
         if (!createdNew)
         {
-            MessageBox.Show("OndaMix ya está abierto.", "OndaMix", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Sonari ya está abierto.", "Sonari", MessageBoxButton.OK, MessageBoxImage.Information);
             _singleInstanceMutex.Dispose();
             _singleInstanceMutex = null;
             Shutdown(0);
@@ -40,7 +40,7 @@ public partial class App : Application
         RegisterGlobalExceptionHandlers();
 
         Log.Information(
-            "OndaMix {Version} arrancando · {Os} · {Runtime} · {Arch}",
+            "Sonari {Version} arrancando · {Os} · {Runtime} · {Arch}",
             typeof(App).Assembly.GetName().Version?.ToString(3),
             Environment.OSVersion.VersionString,
             RuntimeInformation.FrameworkDescription,
@@ -59,8 +59,8 @@ public partial class App : Application
         {
             Log.Fatal(ex, "Fallo durante el arranque");
             MessageBox.Show(
-                $"OndaMix no pudo arrancar:\n\n{ex.Message}\n\nHay más detalles en:\n{paths.LogDirectory}",
-                "OndaMix", MessageBoxButton.OK, MessageBoxImage.Error);
+                $"Sonari no pudo arrancar:\n\n{ex.Message}\n\nHay más detalles en:\n{paths.LogDirectory}",
+                "Sonari", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
     }
@@ -83,7 +83,7 @@ public partial class App : Application
             }
         }
 
-        Log.Information("OndaMix cerrado (código {ExitCode})", e.ApplicationExitCode);
+        Log.Information("Sonari cerrado (código {ExitCode})", e.ApplicationExitCode);
         Log.CloseAndFlush();
 
         if (_singleInstanceMutex is not null)
@@ -105,7 +105,7 @@ public partial class App : Application
             .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
             .Enrich.FromLogContext()
             .WriteTo.File(
-                Path.Combine(paths.LogDirectory, "ondamix-.log"),
+                Path.Combine(paths.LogDirectory, "sonari-.log"),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 14,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
@@ -134,7 +134,7 @@ public partial class App : Application
         Log.Error(e.Exception, "Excepción no controlada en el hilo de UI");
         MessageBox.Show(
             $"Se produjo un error inesperado:\n\n{e.Exception.Message}\n\nSe ha guardado en el registro.",
-            "OndaMix", MessageBoxButton.OK, MessageBoxImage.Warning);
+            "Sonari", MessageBoxButton.OK, MessageBoxImage.Warning);
         e.Handled = true;
     }
 }

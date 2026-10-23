@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
-  <assemblyIdentity version="1.0.0.0" name="OndaMix.App" />
+  <assemblyIdentity version="1.0.0.0" name="Sonari.App" />
 
   <!-- La aplicación no necesita privilegios de administrador. Solo el futuro instalador del driver los pedirá. -->
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
