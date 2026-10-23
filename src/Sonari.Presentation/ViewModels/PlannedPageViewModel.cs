@@ -19,19 +19,9 @@ public sealed class PlannedPageViewModel(
 
     public IReadOnlyList<string> PlannedFeatures { get; } = plannedFeatures;
 
-    /// <summary>Páginas pendientes, en el orden en que aparecen en la navegación (después del Mezclador).</summary>
+    /// <summary>Páginas pendientes, en el orden en que aparecen en la navegación (después de Mezclador y Fuentes).</summary>
     public static IEnumerable<PlannedPageViewModel> CreateDefaults()
     {
-        yield return new("sources", "Fuentes", "",
-            "Micrófono físico, aplicaciones concretas y audio del sistema.",
-            3,
-            [
-                "Selector de procesos con icono, PID y actividad de audio",
-                "Captura por aplicación (Application Loopback)",
-                "Audio del sistema excluyendo a Sonari para evitar realimentación",
-                "Reenganche automático cuando una aplicación se reinicia",
-            ]);
-
         yield return new("soundboard", "Sonidos", "",
             "Bancos de sonidos con atajos globales y parada de emergencia.",
             4,

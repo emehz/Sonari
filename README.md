@@ -2,7 +2,7 @@
 
 Mezclador de audio en tiempo real para Windows: micrófono, aplicaciones concretas, audio del sistema y sonidos, todo enviado a un micrófono virtual y con monitoreo independiente por auriculares.
 
-> **Estado: Fase 2 (motor básico).** Micrófono → auriculares en tiempo real, con compensación de deriva de reloj, medidores, diagnóstico y recuperación cuando un dispositivo se desconecta. Todavía no hay captura por aplicación (Fase 3), reproductor de sonidos (Fase 4) ni micrófono virtual (Fase 5). Detalles en [docs/02-fase-2-motor-basico.md](docs/02-fase-2-motor-basico.md).
+> **Estado: Fase 3 (captura por aplicación).** Micrófono, aplicaciones concretas y audio del sistema, cada uno como canal independiente, con compensación de deriva, medidores y reconexión automática. Todavía no hay reproductor de sonidos (Fase 4) ni micrófono virtual (Fase 5). Detalles en [docs/02-fase-2-motor-basico.md](docs/02-fase-2-motor-basico.md) y [docs/03-fase-3-captura-por-aplicacion.md](docs/03-fase-3-captura-por-aplicacion.md).
 
 ## Requisitos
 
@@ -41,7 +41,7 @@ src/
   Sonari.Presentation   Vistas XAML, ViewModels (MVVM) y tema oscuro
   Sonari.Audio.Core     Contratos, formatos, buffers lock-free (sin dependencias)
   Sonari.Audio.Engine   Grafo de mezcla, compensación de deriva, supervisor (sin NAudio)
-  Sonari.Audio.Capture  Captura WASAPI (micrófono)
+  Sonari.Audio.Capture  Captura WASAPI: micrófono, aplicaciones y sistema
   Sonari.Audio.Output   Salida WASAPI (monitoreo)
   Sonari.Audio.Devices  Endpoints WASAPI, notificaciones de dispositivos
   Sonari.Infrastructure Ajustes en JSON con escritura atómica y rutas
@@ -50,6 +50,7 @@ tests/
 docs/
   01-viabilidad-y-arquitectura.md   Diseño completo, riesgos y plan por fases
   02-fase-2-motor-basico.md         Motor de audio: decisiones, pruebas y limitaciones
+  03-fase-3-captura-por-aplicacion.md  Captura por aplicación y audio del sistema
 ```
 
 `dotnet test` usa Microsoft.Testing.Platform (configurado en `global.json`), como exige xUnit v3 con el SDK de .NET 10. El Explorador de pruebas de Visual Studio funciona sin cambios.

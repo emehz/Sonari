@@ -39,20 +39,14 @@ public readonly record struct StereoPeak(float Left, float Right)
 }
 
 /// <summary>
-/// Métricas en tiempo real. Es un struct para que leerlas 30 veces por segundo no genere basura.
-/// Los contadores son acumulados desde el arranque; los picos, desde la lectura anterior.
+/// Métricas del bus de monitoreo. Es un struct para que leerlas 30 veces por segundo no genere basura.
+/// Las de cada fuente están en <see cref="ISourceChannel.ReadMetrics"/>.
 /// </summary>
+/// <param name="Resyncs">Veces que se descartó audio acumulado (suma de todas las fuentes).</param>
 public readonly record struct EngineMetrics(
-    StereoPeak MicrophoneInput,
-    StereoPeak MicrophonePostFader,
     StereoPeak MonitorOutput,
-    double MonitorBufferMilliseconds,
-    double MonitorDriftPpm,
-    long Underruns,
-    long OverrunSamples,
-    long Resyncs,
-    long CaptureDiscontinuities,
-    long ClippedSamples);
+    long ClippedSamples,
+    long Resyncs);
 
 public interface IChannelControl
 {
@@ -71,8 +65,8 @@ public interface IBusControl
 }
 
 /// <summary>
-/// Motor de audio. Los controles (<see cref="Microphone"/>, <see cref="Monitor"/>) son seguros desde cualquier hilo y
-/// conservan su valor entre arranques. Start/Stop pueden tardar (abren dispositivos): no esperar en el hilo de UI de forma síncrona.
+/// Motor de audio. Los controles de fuentes y buses son seguros desde cualquier hilo y conservan su valor entre
+/// arranques. Start/Stop pueden tardar (abren dispositivos): no esperar en el hilo de UI de forma síncrona.
 /// </summary>
 public interface IAudioEngine : IAsyncDisposable
 {
@@ -81,15 +75,39 @@ public interface IAudioEngine : IAsyncDisposable
     /// <summary>Puede llegar en cualquier hilo.</summary>
     event EventHandler<EngineStatus>? StatusChanged;
 
-    IChannelControl Microphone { get; }
+    /// <summary>
+    /// Se dispara cuando se añade o quita una fuente o cambia el estado de alguna. Puede llegar en cualquier hilo
+    /// y en ráfagas: los suscriptores deben releer <see cref="Sources"/>.
+    /// </summary>
+    event EventHandler? SourcesChanged;
+
+    ISourceChannel Microphone { get; }
+
+    /// <summary>Todas las fuentes, con el micrófono primero. Instantánea: una lista nueva en cada cambio.</summary>
+    IReadOnlyList<ISourceChannel> Sources { get; }
 
     IBusControl Monitor { get; }
+
+    /// <summary>Si es falso, no se pueden añadir fuentes de aplicación ni de sistema.</summary>
+    bool SupportsProcessCapture { get; }
+
+    /// <summary>
+    /// Añade una aplicación como fuente independiente. Si el motor está en marcha, empieza a capturarla sin tocar las
+    /// demás fuentes; si no, se capturará al arrancar. Por defecto no se envía al monitoreo (ya la oyes directamente).
+    /// </summary>
+    ISourceChannel AddApplicationSource(ApplicationTarget target);
+
+    /// <summary>Añade (o devuelve, si ya existe) la fuente «audio del sistema excepto Sonari».</summary>
+    ISourceChannel AddSystemAudioSource();
+
+    /// <summary>Quita una fuente y libera su captura. El micrófono no se puede quitar.</summary>
+    void RemoveSource(ISourceChannel source);
 
     /// <summary>Arranca (o reinicia con nuevas opciones). Si un dispositivo falla, el motor queda en Recovering y reintenta.</summary>
     Task StartAsync(EngineOptions options, CancellationToken cancellationToken = default);
 
     Task StopAsync();
 
-    /// <summary>Lee y reinicia los picos. Pensado para un único lector (la UI).</summary>
+    /// <summary>Lee y reinicia los picos del monitoreo. Pensado para un único lector (la UI).</summary>
     EngineMetrics ReadMetrics();
 }

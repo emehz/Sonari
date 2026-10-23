@@ -12,6 +12,8 @@
              d:DesignWidth="940" d:DesignHeight="720">
 
   <UserControl.Resources>
+    <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
     <Style x:Key="StatLabel" TargetType="TextBlock" BasedOn="{StaticResource Text.Caption}">
       <Setter Property="Margin" Value="0,0,0,2" />
     </Style>
@@ -20,13 +22,71 @@
       <Setter Property="FontFamily" Value="Consolas, Segoe UI" />
       <Setter Property="Foreground" Value="{StaticResource Brush.Text}" />
     </Style>
+
+    <!-- Tira de canal: una por fuente -->
+    <DataTemplate x:Key="ChannelStrip" DataType="{x:Type vm:ChannelViewModel}">
+      <Border Style="{StaticResource Card}" Width="300" Margin="0,0,16,16">
+        <StackPanel>
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+              <ToggleButton Style="{StaticResource Toggle.Mute}" IsChecked="{Binding IsMuted}"
+                            ToolTip="Silenciar este canal" AutomationProperties.Name="Silenciar canal">
+                <TextBlock Text="&#xE74F;" FontFamily="{StaticResource Font.Icons}" FontSize="14"
+                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+              </ToggleButton>
+              <Button Style="{StaticResource Button.Ghost}" Margin="4,0,0,0" Padding="8"
+                      Visibility="{Binding CanRemove, Converter={StaticResource BoolToVisibility}}"
+                      Command="{Binding DataContext.RemoveChannelCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                      CommandParameter="{Binding}" ToolTip="Quitar del mezclador" AutomationProperties.Name="Quitar fuente">
+                <TextBlock Text="&#xE711;" Style="{StaticResource Text.Icon}" FontSize="12" />
+              </Button>
+            </StackPanel>
+
+            <Grid Width="28" Height="28" VerticalAlignment="Top">
+              <Image Source="{Binding Icon}" Width="24" Height="24"
+                     Visibility="{Binding HasIcon, Converter={StaticResource BoolToVisibility}}" />
+              <TextBlock Text="{Binding Glyph}" Style="{StaticResource Text.Icon}" HorizontalAlignment="Center"
+                         Visibility="{Binding HasIcon, Converter={x:Static conv:VisibilityConverters.False}}" />
+            </Grid>
+
+            <StackPanel Margin="10,0,8,0">
+              <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Section}" TextTrimming="CharacterEllipsis"
+                         ToolTip="{Binding DisplayName}" />
+              <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                <Ellipse Style="{StaticResource StatusDot.Source}" />
+                <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource Text.Caption}" Margin="6,0,0,0"
+                           MaxWidth="170" ToolTip="{Binding StatusMessage}" />
+              </StackPanel>
+            </StackPanel>
+          </DockPanel>
+
+          <controls:LevelMeter LevelDb="{Binding LevelDb}" PeakDb="{Binding PeakDb}" Height="8" Margin="0,16,0,0" />
+
+          <DockPanel Margin="0,14,0,4">
+            <TextBlock DockPanel.Dock="Right" Text="{Binding GainText}" Style="{StaticResource Text.Caption}" />
+            <TextBlock Text="Ganancia" Style="{StaticResource Text.Caption}" />
+          </DockPanel>
+          <Slider Minimum="-60" Maximum="12" Value="{Binding GainDb}" SmallChange="0.5" LargeChange="3"
+                  AutomationProperties.Name="Ganancia del canal" />
+
+          <ToggleButton Style="{StaticResource Switch}" Margin="0,14,0,0" IsChecked="{Binding SendToMonitor}"
+                        Content="Enviar al monitoreo" ToolTip="{Binding MonitorHint}" />
+          <TextBlock Text="{Binding MonitorHint}" Style="{StaticResource Text.Caption}" Margin="46,4,0,0"
+                     TextWrapping="Wrap" TextTrimming="None" />
+
+          <TextBlock Text="{Binding Diagnostics}" Style="{StaticResource Text.Caption}" Margin="0,12,0,0"
+                     TextWrapping="Wrap" TextTrimming="None" FontFamily="Consolas, Segoe UI"
+                     Visibility="{Binding Diagnostics, Converter={x:Static conv:VisibilityConverters.NotNull}}" />
+        </StackPanel>
+      </Border>
+    </DataTemplate>
   </UserControl.Resources>
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="32,28,32,24">
+    <StackPanel Margin="32,28,16,24">
 
       <!-- Cabecera con el interruptor del motor -->
-      <DockPanel>
+      <DockPanel Margin="0,0,16,0">
         <Button DockPanel.Dock="Right" VerticalAlignment="Top" MinWidth="140"
                 Style="{StaticResource Button.Accent}"
                 Command="{Binding ToggleEngineCommand}">
@@ -53,7 +113,7 @@
       </DockPanel>
 
       <!-- Estado -->
-      <Border Style="{StaticResource Card}" Margin="0,20,0,0" Padding="14,10">
+      <Border Style="{StaticResource Card}" Margin="0,20,16,0" Padding="14,10">
         <StackPanel Orientation="Horizontal">
           <Ellipse Width="10" Height="10" VerticalAlignment="Center">
             <Ellipse.Style>
@@ -82,7 +142,7 @@
       </Border>
 
       <!-- Dispositivos -->
-      <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+      <Border Style="{StaticResource Card}" Margin="0,16,16,0">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
@@ -107,49 +167,34 @@
         </Grid>
       </Border>
 
+      <!-- Aviso de duplicación -->
+      <Border Style="{StaticResource Card.Warning}" Margin="0,16,16,0"
+              Visibility="{Binding HasDuplicationRisk, Converter={StaticResource BoolToVisibility}}">
+        <TextBlock Style="{StaticResource Text.Body}" Foreground="{StaticResource Brush.Warning}"
+                   Text="«Audio del sistema» ya incluye las aplicaciones que capturas por separado: sonarán dos veces. Silencia una de las dos o quita la que sobre." />
+      </Border>
+
       <!-- Canales -->
-      <Grid Margin="0,16,0,0">
+      <TextBlock Text="Canales" Style="{StaticResource Text.Section}" Margin="0,24,0,12" />
+      <ItemsControl ItemsSource="{Binding Channels}" ItemTemplate="{StaticResource ChannelStrip}" Focusable="False">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+      </ItemsControl>
+      <TextBlock Style="{StaticResource Text.Caption}" Margin="0,-6,0,0" TextTrimming="None"
+                 Text="Añade aplicaciones o el audio del sistema desde la sección Fuentes." />
+
+      <!-- Bus de monitoreo y diagnóstico -->
+      <Grid Margin="0,24,16,0">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="300" />
           <ColumnDefinition Width="16" />
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- Micrófono -->
         <Border Grid.Column="0" Style="{StaticResource Card}">
-          <StackPanel>
-            <DockPanel>
-              <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Toggle.Mute}"
-                            IsChecked="{Binding MicMuted}" ToolTip="Silenciar micrófono"
-                            AutomationProperties.Name="Silenciar micrófono">
-                <TextBlock Text="&#xEC54;" FontFamily="{StaticResource Font.Icons}" FontSize="14"
-                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
-              </ToggleButton>
-              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="&#xE720;" Style="{StaticResource Text.Icon}" />
-                <TextBlock Text="Micrófono" Style="{StaticResource Text.Section}" Margin="10,0,0,0" />
-              </StackPanel>
-            </DockPanel>
-
-            <TextBlock Text="Entrada" Style="{StaticResource Text.Caption}" Margin="0,16,0,6" />
-            <controls:LevelMeter LevelDb="{Binding MicLevelDb}" PeakDb="{Binding MicPeakDb}" Height="8" />
-
-            <DockPanel Margin="0,16,0,4">
-              <TextBlock DockPanel.Dock="Right" Text="{Binding MicGainText}" Style="{StaticResource Text.Caption}" />
-              <TextBlock Text="Ganancia" Style="{StaticResource Text.Caption}" />
-            </DockPanel>
-            <Slider Minimum="{Binding MinGainDb}" Maximum="{Binding MaxGainDb}" Value="{Binding MicGainDb}"
-                    SmallChange="0.5" LargeChange="3" AutomationProperties.Name="Ganancia del micrófono" />
-
-            <ToggleButton Style="{StaticResource Switch}" Margin="0,16,0,0" IsChecked="{Binding MicToMonitor}"
-                          Content="Escucharme por los auriculares" />
-            <TextBlock Style="{StaticResource Text.Caption}" Margin="46,4,0,0" TextWrapping="Wrap" TextTrimming="None"
-                       Text="Usa auriculares: con altavoces el micrófono capta su propia salida y se acopla." />
-          </StackPanel>
-        </Border>
-
-        <!-- Bus de monitoreo -->
-        <Border Grid.Column="2" Style="{StaticResource Card}">
           <StackPanel>
             <DockPanel>
               <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Toggle.Mute}"
@@ -164,60 +209,38 @@
               </StackPanel>
             </DockPanel>
 
-            <TextBlock Text="Salida" Style="{StaticResource Text.Caption}" Margin="0,16,0,6" />
-            <controls:LevelMeter LevelDb="{Binding MonitorLevelDb}" PeakDb="{Binding MonitorPeakDb}" Height="8" />
+            <controls:LevelMeter LevelDb="{Binding MonitorLevelDb}" PeakDb="{Binding MonitorPeakDb}" Height="8" Margin="0,16,0,0" />
 
-            <DockPanel Margin="0,16,0,4">
+            <DockPanel Margin="0,14,0,4">
               <TextBlock DockPanel.Dock="Right" Text="{Binding MonitorGainText}" Style="{StaticResource Text.Caption}" />
               <TextBlock Text="Volumen" Style="{StaticResource Text.Caption}" />
             </DockPanel>
             <Slider Minimum="{Binding MinGainDb}" Maximum="{Binding MaxGainDb}" Value="{Binding MonitorGainDb}"
                     SmallChange="0.5" LargeChange="3" AutomationProperties.Name="Volumen de monitoreo" />
 
-            <TextBlock Style="{StaticResource Text.Caption}" Margin="0,16,0,0" TextWrapping="Wrap" TextTrimming="None"
+            <TextBlock Style="{StaticResource Text.Caption}" Margin="0,14,0,0" TextWrapping="Wrap" TextTrimming="None"
                        Text="Lo que oyes aquí nunca se envía al micrófono virtual." />
           </StackPanel>
         </Border>
-      </Grid>
 
-      <!-- Diagnóstico -->
-      <Border Style="{StaticResource Card}" Margin="0,16,0,0">
-        <StackPanel>
-          <TextBlock Text="Diagnóstico del motor" Style="{StaticResource Text.Section}" />
-          <TextBlock Style="{StaticResource Text.Body}" Margin="0,4,0,14"
-                     Text="Contadores acumulados desde que se inició el motor. En uso normal, todos menos el buffer y la deriva deberían quedarse quietos." />
-          <UniformGrid Columns="4" Rows="2">
-            <StackPanel Margin="0,0,0,12">
-              <TextBlock Text="Buffer de compensación" Style="{StaticResource StatLabel}" />
-              <TextBlock Text="{Binding BufferText}" Style="{StaticResource StatValue}" />
-            </StackPanel>
-            <StackPanel Margin="0,0,0,12">
-              <TextBlock Text="Corrección de deriva" Style="{StaticResource StatLabel}" />
-              <TextBlock Text="{Binding DriftText}" Style="{StaticResource StatValue}" />
-            </StackPanel>
-            <StackPanel Margin="0,0,0,12">
-              <TextBlock Text="Vaciados (underruns)" Style="{StaticResource StatLabel}" />
-              <TextBlock Text="{Binding Underruns}" Style="{StaticResource StatValue}" />
-            </StackPanel>
-            <StackPanel Margin="0,0,0,12">
-              <TextBlock Text="Muestras perdidas (overruns)" Style="{StaticResource StatLabel}" />
-              <TextBlock Text="{Binding OverrunSamples}" Style="{StaticResource StatValue}" />
-            </StackPanel>
-            <StackPanel>
-              <TextBlock Text="Resincronizaciones" Style="{StaticResource StatLabel}" />
-              <TextBlock Text="{Binding Resyncs}" Style="{StaticResource StatValue}" />
-            </StackPanel>
-            <StackPanel>
-              <TextBlock Text="Huecos de captura" Style="{StaticResource StatLabel}" />
-              <TextBlock Text="{Binding Discontinuities}" Style="{StaticResource StatValue}" />
-            </StackPanel>
-            <StackPanel>
-              <TextBlock Text="Muestras recortadas" Style="{StaticResource StatLabel}" />
-              <TextBlock Text="{Binding ClippedSamples}" Style="{StaticResource StatValue}" />
-            </StackPanel>
-          </UniformGrid>
-        </StackPanel>
-      </Border>
+        <Border Grid.Column="2" Style="{StaticResource Card}">
+          <StackPanel>
+            <TextBlock Text="Diagnóstico del motor" Style="{StaticResource Text.Section}" />
+            <TextBlock Style="{StaticResource Text.Body}" Margin="0,4,0,14"
+                       Text="Cada canal muestra su buffer, su deriva y sus vaciados. «Pausas» en una aplicación significa que dejó de sonar, no es un error." />
+            <UniformGrid Columns="2">
+              <StackPanel>
+                <TextBlock Text="Resincronizaciones" Style="{StaticResource StatLabel}" />
+                <TextBlock Text="{Binding Resyncs}" Style="{StaticResource StatValue}" />
+              </StackPanel>
+              <StackPanel>
+                <TextBlock Text="Muestras recortadas" Style="{StaticResource StatLabel}" />
+                <TextBlock Text="{Binding ClippedSamples}" Style="{StaticResource StatValue}" />
+              </StackPanel>
+            </UniformGrid>
+          </StackPanel>
+        </Border>
+      </Grid>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

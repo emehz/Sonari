@@ -8,11 +8,12 @@ using Sonari.Audio.Engine.Routing;
 namespace Sonari.Audio.Engine;
 
 /// <summary>
-/// Motor de audio de la Fase 2: micrófono → compensación de deriva → bus de monitoreo → auriculares.
+/// Motor de audio: micrófono y fuentes de aplicación/sistema → compensación de deriva → bus de monitoreo → auriculares.
 /// <para>
-/// Un supervisor en segundo plano abre los dispositivos y los vuelve a abrir si fallan, si desaparecen o si cambia el
-/// predeterminado de Windows (cuando el usuario no eligió uno concreto). El grafo de audio se crea una vez por
-/// <see cref="StartAsync"/>, así que ganancias, contadores y medidores sobreviven a las recuperaciones.
+/// Un supervisor abre el micrófono y la salida y los vuelve a abrir si fallan, desaparecen o cambia el predeterminado
+/// de Windows. Cada fuente de aplicación tiene su propio bucle de captura (<see cref="ProcessCaptureRunner"/>), de modo
+/// que añadir, quitar o perder una aplicación no interrumpe al resto. Los controles de las fuentes viven fuera de los
+/// arranques, así que ganancias y envíos se conservan.
 /// </para>
 /// </summary>
 public sealed class AudioEngine : IAudioEngine
@@ -22,16 +23,24 @@ public sealed class AudioEngine : IAudioEngine
 
     private readonly ICaptureStreamFactory _captureFactory;
     private readonly IRenderStreamFactory _renderFactory;
+    private readonly IProcessCaptureStreamFactory _processCaptureFactory;
+    private readonly IProcessLocator _processLocator;
     private readonly IAudioDeviceWatcher? _watcher;
     private readonly ILogger<AudioEngine> _logger;
-    private readonly ChannelControl _microphone = new();
+    private readonly SourceChannel _microphone;
     private readonly BusControl _monitor = new();
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private readonly SemaphoreSlim _wake = new(0, int.MaxValue);
 
+    // Protege _sources, _runners, _monitorBus y _running frente a añadir/quitar fuentes desde la UI durante un arranque.
+    private readonly object _sourcesLock = new();
+    private readonly Dictionary<Guid, ProcessCaptureRunner> _runners = [];
+    private SourceChannel[] _sources;
+    private bool _running;
+
     private EngineStatus _status = EngineStatus.Stopped;
     private EngineOptions? _options;
-    private MixerChannel? _micChannel;
+    private int _targetFrames;
     private MonitorBus? _monitorBus;
     private IAudioStream? _capture;
     private IAudioStream? _render;
@@ -46,16 +55,21 @@ public sealed class AudioEngine : IAudioEngine
     public AudioEngine(
         ICaptureStreamFactory captureFactory,
         IRenderStreamFactory renderFactory,
+        IProcessCaptureStreamFactory processCaptureFactory,
+        IProcessLocator processLocator,
         IAudioDeviceWatcher? watcher,
         ILogger<AudioEngine> logger)
     {
         _captureFactory = captureFactory;
         _renderFactory = renderFactory;
+        _processCaptureFactory = processCaptureFactory;
+        _processLocator = processLocator;
         _watcher = watcher;
         _logger = logger;
 
         // Por seguridad frente a la realimentación, el micrófono no se oye hasta que el usuario lo pide.
-        _microphone.SendToMonitor = false;
+        _microphone = new SourceChannel(SourceKind.Microphone, "Micrófono", target: null, RaiseSourcesChanged);
+        _sources = [_microphone];
 
         if (_watcher is not null)
         {
@@ -67,9 +81,15 @@ public sealed class AudioEngine : IAudioEngine
 
     public event EventHandler<EngineStatus>? StatusChanged;
 
-    public IChannelControl Microphone => _microphone;
+    public event EventHandler? SourcesChanged;
+
+    public ISourceChannel Microphone => _microphone;
+
+    public IReadOnlyList<ISourceChannel> Sources => Volatile.Read(ref _sources);
 
     public IBusControl Monitor => _monitor;
+
+    public bool SupportsProcessCapture => _processCaptureFactory.IsSupported;
 
     public async Task StartAsync(EngineOptions options, CancellationToken cancellationToken = default)
     {
@@ -79,16 +99,25 @@ public sealed class AudioEngine : IAudioEngine
         {
             await StopCoreAsync().ConfigureAwait(false);
 
-            _options = options;
-            int targetFrames = options.Format.FramesFor(TimeSpan.FromMilliseconds(TargetBufferMilliseconds(options)));
-            _micChannel = new MixerChannel(_microphone, options.Format, targetFrames);
-            _monitorBus = new MonitorBus(_monitor, options.Format.Channels, _micChannel);
-
             SetStatus(new EngineStatus(EngineState.Starting, "Abriendo dispositivos…"));
             _logger.LogInformation(
                 "Arrancando motor: {Format}, bloque {Block} ms, entrada {Input}, monitoreo {Monitor}",
                 options.Format, options.BlockMilliseconds, options.InputDeviceId ?? "(predeterminada)",
                 options.MonitorDeviceId ?? "(predeterminada)");
+
+            lock (_sourcesLock)
+            {
+                Volatile.Write(ref _options, options);
+                _targetFrames = options.Format.FramesFor(TimeSpan.FromMilliseconds(TargetBufferMilliseconds(options)));
+                _monitorBus = new MonitorBus(_monitor, options.Format.Channels);
+                foreach (SourceChannel source in _sources)
+                {
+                    source.Mixer = CreateMixer(source);
+                }
+
+                PublishBusChannels();
+                _running = true;
+            }
 
             _previousGcMode = GCSettings.LatencyMode;
             GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
@@ -99,6 +128,17 @@ public sealed class AudioEngine : IAudioEngine
             // Abrir dispositivos es COM y puede tardar: nunca en el hilo del llamador (normalmente la UI).
             await Task.Run(TryOpenStreams, CancellationToken.None).ConfigureAwait(false);
             _supervisor = Task.Run(() => SuperviseAsync(token), CancellationToken.None);
+
+            lock (_sourcesLock)
+            {
+                foreach (SourceChannel source in _sources)
+                {
+                    if (source.Kind != SourceKind.Microphone)
+                    {
+                        StartRunner(source);
+                    }
+                }
+            }
         }
         finally
         {
@@ -119,28 +159,73 @@ public sealed class AudioEngine : IAudioEngine
         }
     }
 
-    public EngineMetrics ReadMetrics()
+    public ISourceChannel AddApplicationSource(ApplicationTarget target)
     {
-        MixerChannel? channel = Volatile.Read(ref _micChannel);
-        MonitorBus? bus = Volatile.Read(ref _monitorBus);
-        EngineOptions? options = Volatile.Read(ref _options);
-        if (channel is null || bus is null || options is null)
+        ArgumentNullException.ThrowIfNull(target);
+        ThrowIfProcessCaptureUnsupported();
+
+        // Ya oyes la aplicación directamente: enviarla también al monitoreo la duplicaría con retardo.
+        var source = new SourceChannel(SourceKind.Application, target.DisplayName, target, RaiseSourcesChanged);
+        AddSource(source);
+        return source;
+    }
+
+    public ISourceChannel AddSystemAudioSource()
+    {
+        ThrowIfProcessCaptureUnsupported();
+        lock (_sourcesLock)
         {
-            return default;
+            SourceChannel? existing = _sources.FirstOrDefault(s => s.Kind == SourceKind.SystemAudio);
+            if (existing is not null)
+            {
+                return existing;
+            }
         }
 
-        DriftCompensatingReader reader = channel.MonitorReader;
-        return new EngineMetrics(
-            MicrophoneInput: channel.InputMeter.ReadAndReset(),
-            MicrophonePostFader: channel.PostFaderMeter.ReadAndReset(),
-            MonitorOutput: bus.OutputMeter.ReadAndReset(),
-            MonitorBufferMilliseconds: reader.IsPriming ? 0 : reader.SmoothedFillFrames * 1000.0 / options.Format.SampleRate,
-            MonitorDriftPpm: reader.CorrectionPpm,
-            Underruns: reader.Underruns,
-            OverrunSamples: channel.OverrunSamples,
-            Resyncs: reader.Resyncs,
-            CaptureDiscontinuities: channel.Discontinuities,
-            ClippedSamples: bus.ClippedSamples);
+        var source = new SourceChannel(SourceKind.SystemAudio, "Audio del sistema", target: null, RaiseSourcesChanged);
+        AddSource(source);
+        return source;
+    }
+
+    public void RemoveSource(ISourceChannel source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (source.Kind == SourceKind.Microphone)
+        {
+            throw new InvalidOperationException("El micrófono no se puede quitar del mezclador.");
+        }
+
+        ProcessCaptureRunner? runner;
+        lock (_sourcesLock)
+        {
+            if (!_sources.Any(s => s.Id == source.Id))
+            {
+                return;
+            }
+
+            Volatile.Write(ref _sources, _sources.Where(s => s.Id != source.Id).ToArray());
+            _runners.Remove(source.Id, out runner);
+            if (_running)
+            {
+                PublishBusChannels();
+            }
+        }
+
+        _logger.LogInformation("Fuente quitada: {Source}", source);
+        RaiseSourcesChanged();
+
+        if (runner is not null)
+        {
+            _ = StopRunnerAsync(runner, (SourceChannel)source);
+        }
+    }
+
+    public EngineMetrics ReadMetrics()
+    {
+        MonitorBus? bus = Volatile.Read(ref _monitorBus);
+        return bus is null
+            ? default
+            : new EngineMetrics(bus.OutputMeter.ReadAndReset(), bus.ClippedSamples, bus.Resyncs);
     }
 
     public async ValueTask DisposeAsync()
@@ -162,12 +247,79 @@ public sealed class AudioEngine : IAudioEngine
 
     internal static int CaptureBufferMilliseconds(EngineOptions options) => Math.Max(50, options.BlockMilliseconds * 4);
 
+    private void AddSource(SourceChannel source)
+    {
+        lock (_sourcesLock)
+        {
+            Volatile.Write(ref _sources, [.. _sources, source]);
+            if (_running)
+            {
+                source.Mixer = CreateMixer(source);
+                PublishBusChannels();
+                StartRunner(source);
+            }
+        }
+
+        _logger.LogInformation("Fuente añadida: {Source}", source);
+        RaiseSourcesChanged();
+    }
+
+    private MixerChannel CreateMixer(SourceChannel source) =>
+        new(source.Control, _options!.Format, _targetFrames, isIntermittent: source.Kind != SourceKind.Microphone);
+
+    /// <summary>Con <see cref="_sourcesLock"/> tomado.</summary>
+    private void PublishBusChannels() =>
+        _monitorBus?.SetChannels(_sources.Select(s => s.Mixer).OfType<MixerChannel>().ToArray());
+
+    /// <summary>Con <see cref="_sourcesLock"/> tomado y el motor en marcha.</summary>
+    private void StartRunner(SourceChannel source)
+    {
+        var runner = new ProcessCaptureRunner(
+            source, source.Mixer!, _options!.Format, _processCaptureFactory, _processLocator, _logger);
+        _runners[source.Id] = runner;
+        runner.Start();
+    }
+
+    private async Task StopRunnerAsync(ProcessCaptureRunner runner, SourceChannel source)
+    {
+        try
+        {
+            await runner.StopAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error al detener la captura de {Source}", source);
+        }
+
+        source.Mixer = null;
+        source.SetStatus(SourceStatus.Stopped, "Motor detenido");
+    }
+
+    private void ThrowIfProcessCaptureUnsupported()
+    {
+        if (!SupportsProcessCapture)
+        {
+            throw new NotSupportedException(
+                "Esta versión de Windows no permite capturar aplicaciones (requiere Windows 10 versión 2004 o posterior).");
+        }
+    }
+
     private async Task StopCoreAsync()
     {
         if (_runCts is null)
         {
             return;
         }
+
+        List<(ProcessCaptureRunner Runner, SourceChannel Source)> runners;
+        lock (_sourcesLock)
+        {
+            _running = false;
+            runners = _runners.Select(r => (r.Value, _sources.First(s => s.Id == r.Key))).ToList();
+            _runners.Clear();
+        }
+
+        await Task.WhenAll(runners.Select(r => StopRunnerAsync(r.Runner, r.Source))).ConfigureAwait(false);
 
         await _runCts.CancelAsync().ConfigureAwait(false);
         _wake.Release();
@@ -188,9 +340,19 @@ public sealed class AudioEngine : IAudioEngine
         _runCts.Dispose();
         _runCts = null;
         _supervisor = null;
-        Volatile.Write(ref _micChannel, null);
-        Volatile.Write(ref _monitorBus, null);
-        Volatile.Write(ref _options, null);
+
+        lock (_sourcesLock)
+        {
+            foreach (SourceChannel source in _sources)
+            {
+                source.Mixer = null;
+            }
+
+            Volatile.Write(ref _monitorBus, null);
+            Volatile.Write(ref _options, null);
+        }
+
+        _microphone.SetStatus(SourceStatus.Stopped, "Motor detenido");
 
         if (_previousGcMode is { } mode)
         {
@@ -245,7 +407,7 @@ public sealed class AudioEngine : IAudioEngine
     {
         EngineOptions options = _options ?? throw new InvalidOperationException("Motor sin configurar.");
         MonitorBus bus = _monitorBus!;
-        MixerChannel channel = _micChannel!;
+        MixerChannel micMixer = _microphone.Mixer!;
         int generation = Interlocked.Increment(ref _generation);
         Volatile.Write(ref _streamFailed, 0);
         bus.ResetForRestart();
@@ -257,7 +419,7 @@ public sealed class AudioEngine : IAudioEngine
             _render.Stopped += ex => OnStreamStopped(generation, "salida de monitoreo", ex);
 
             _capture = _captureFactory.Open(
-                options.InputDeviceId, options.Format, CaptureBufferMilliseconds(options), channel.OnCaptured);
+                options.InputDeviceId, options.Format, CaptureBufferMilliseconds(options), micMixer.OnCaptured);
             _capture.Stopped += ex => OnStreamStopped(generation, "micrófono", ex);
 
             _render.Start();
@@ -268,6 +430,7 @@ public sealed class AudioEngine : IAudioEngine
                 _capture.DeviceName, _capture.ReportedLatencyMilliseconds,
                 _render.DeviceName, _render.ReportedLatencyMilliseconds);
 
+            _microphone.SetStatus(SourceStatus.Active, _capture.DeviceName);
             SetStatus(new EngineStatus(
                 EngineState.Running,
                 "En marcha",
@@ -288,6 +451,7 @@ public sealed class AudioEngine : IAudioEngine
                 "No se pudieron abrir los dispositivos de audio (intento {Attempt})",
                 _consecutiveOpenFailures);
             CloseStreams();
+            _microphone.SetStatus(SourceStatus.Waiting, ex.Message);
             SetStatus(new EngineStatus(EngineState.Recovering, $"{ex.Message} Reintentando cada {RetryInterval.TotalSeconds:0} s…"));
             return false;
         }
@@ -330,6 +494,7 @@ public sealed class AudioEngine : IAudioEngine
 
         _logger.LogWarning(exception, "Se detuvo inesperadamente: {Role}", role);
         Volatile.Write(ref _streamFailed, 1);
+        _microphone.SetStatus(SourceStatus.Waiting, $"Se perdió el {role}. Reintentando…");
         SetStatus(new EngineStatus(EngineState.Recovering, $"Se perdió el {role}. Reintentando…"));
         _wake.Release();
     }
@@ -360,4 +525,6 @@ public sealed class AudioEngine : IAudioEngine
         Volatile.Write(ref _status, status);
         StatusChanged?.Invoke(this, status);
     }
+
+    private void RaiseSourcesChanged() => SourcesChanged?.Invoke(this, EventArgs.Empty);
 }

@@ -11,6 +11,10 @@ public static class VisibilityConverters
     public static IValueConverter NotNull { get; } = new DelegateConverter(value =>
         value is null || (value is string s && s.Length == 0) ? Visibility.Collapsed : Visibility.Visible);
 
+    /// <summary>Visible si el valor es <c>false</c> (inverso de BooleanToVisibilityConverter).</summary>
+    public static IValueConverter False { get; } = new DelegateConverter(value =>
+        value is false ? Visibility.Visible : Visibility.Collapsed);
+
     /// <summary>Visible si el valor es el entero 0 (para estados vacíos de listas).</summary>
     public static IValueConverter Zero { get; } = new DelegateConverter(value =>
         value is 0 ? Visibility.Visible : Visibility.Collapsed);

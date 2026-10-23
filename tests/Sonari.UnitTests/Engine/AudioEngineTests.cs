@@ -12,13 +12,15 @@ public sealed class AudioEngineTests : IAsyncDisposable
 {
     private static readonly EngineOptions Options = new(AudioFormat.Default, 10, InputDeviceId: null, MonitorDeviceId: null);
 
-    private readonly FakeFactory _factory = new();
+    private readonly FakeDeviceFactory _factory = new();
     private readonly FakeWatcher _watcher = new();
     private readonly AudioEngine _engine;
 
     public AudioEngineTests()
     {
-        _engine = new AudioEngine(_factory, _factory, _watcher, NullLogger<AudioEngine>.Instance);
+        _engine = new AudioEngine(
+            _factory, _factory, new FakeProcessCaptureFactory(), new FakeProcessLocator(), _watcher,
+            NullLogger<AudioEngine>.Instance);
     }
 
     public async ValueTask DisposeAsync() => await _engine.DisposeAsync();
@@ -29,6 +31,7 @@ public sealed class AudioEngineTests : IAsyncDisposable
         await _engine.StartAsync(Options, TestContext.Current.CancellationToken);
 
         Assert.Equal(EngineState.Running, _engine.Status.State);
+        Assert.Equal(SourceStatus.Active, _engine.Microphone.Status);
         Assert.Single(_factory.Captures);
         Assert.Single(_factory.Renders);
         Assert.True(_factory.Captures[0].Started);
@@ -76,7 +79,7 @@ public sealed class AudioEngineTests : IAsyncDisposable
 
         _factory.Renders[0].Fail(new InvalidOperationException("AUDCLNT_E_DEVICE_INVALIDATED"));
 
-        await WaitUntil(() => _factory.Renders.Count == 2 && _engine.Status.State == EngineState.Running);
+        await Eventually.True(() => _factory.Renders.Count == 2 && _engine.Status.State == EngineState.Running);
         Assert.True(_factory.Renders[0].Disposed);
         Assert.True(_factory.Captures[0].Disposed);
         Assert.True(_factory.Captures[1].Started);
@@ -89,11 +92,12 @@ public sealed class AudioEngineTests : IAsyncDisposable
 
         await _engine.StartAsync(Options, TestContext.Current.CancellationToken);
         Assert.Equal(EngineState.Recovering, _engine.Status.State);
+        Assert.Equal(SourceStatus.Waiting, _engine.Microphone.Status);
 
         // Un aviso de Windows provoca un reintento inmediato en vez de esperar al temporizador.
         _watcher.Raise(new EndpointChange(EndpointChangeKind.Added, "nuevo", null));
 
-        await WaitUntil(() => _engine.Status.State == EngineState.Running);
+        await Eventually.True(() => _engine.Status.State == EngineState.Running);
         Assert.Equal(0, _factory.FailOpens);
     }
 
@@ -104,7 +108,7 @@ public sealed class AudioEngineTests : IAsyncDisposable
 
         _watcher.Raise(new EndpointChange(EndpointChangeKind.DefaultChanged, "otro", EndpointFlow.Render));
 
-        await WaitUntil(() => _factory.Renders.Count == 2 && _engine.Status.State == EngineState.Running);
+        await Eventually.True(() => _factory.Renders.Count == 2 && _engine.Status.State == EngineState.Running);
     }
 
     [Fact]
@@ -127,6 +131,7 @@ public sealed class AudioEngineTests : IAsyncDisposable
         await _engine.StopAsync();
 
         Assert.Equal(EngineState.Stopped, _engine.Status.State);
+        Assert.Equal(SourceStatus.Stopped, _engine.Microphone.Status);
         Assert.True(_factory.Captures[0].Disposed);
         Assert.True(_factory.Renders[0].Disposed);
         Assert.Equal(default, _engine.ReadMetrics());
@@ -144,116 +149,5 @@ public sealed class AudioEngineTests : IAsyncDisposable
 
         Assert.Equal(-6, _engine.Microphone.GainDb);
         Assert.True(_engine.Monitor.IsMuted);
-    }
-
-    private static async Task WaitUntil(Func<bool> condition)
-    {
-        DateTime deadline = DateTime.UtcNow.AddSeconds(8);
-        while (!condition())
-        {
-            if (DateTime.UtcNow > deadline)
-            {
-                Assert.Fail("La condición no se cumplió a tiempo.");
-            }
-
-            await Task.Delay(20, TestContext.Current.CancellationToken);
-        }
-    }
-
-    private sealed class FakeFactory : ICaptureStreamFactory, IRenderStreamFactory
-    {
-        private int _failOpens;
-
-        public List<FakeStream> Captures { get; } = [];
-
-        public List<FakeStream> Renders { get; } = [];
-
-        public int FailOpens
-        {
-            get => Volatile.Read(ref _failOpens);
-            set => Volatile.Write(ref _failOpens, value);
-        }
-
-        public IAudioStream Open(string? deviceId, AudioFormat format, int bufferMilliseconds, CaptureDataHandler onData)
-        {
-            ThrowIfConfiguredToFail();
-            var stream = new FakeStream(deviceId, format) { OnCapture = onData };
-            lock (Captures)
-            {
-                Captures.Add(stream);
-            }
-
-            return stream;
-        }
-
-        public IAudioStream Open(string? deviceId, AudioFormat format, int latencyMilliseconds, RenderHandler render)
-        {
-            var stream = new FakeStream(deviceId, format) { OnRender = render };
-            lock (Renders)
-            {
-                Renders.Add(stream);
-            }
-
-            return stream;
-        }
-
-        private void ThrowIfConfiguredToFail()
-        {
-            if (Interlocked.Decrement(ref _failOpens) >= 0)
-            {
-                throw new AudioDeviceUnavailableException("Micrófono desconectado.");
-            }
-
-            Interlocked.Exchange(ref _failOpens, 0);
-        }
-    }
-
-    private sealed class FakeStream(string? deviceId, AudioFormat format) : IAudioStream
-    {
-        public CaptureDataHandler? OnCapture { get; init; }
-
-        public RenderHandler? OnRender { get; init; }
-
-        public string? DeviceId { get; } = deviceId;
-
-        public bool Started { get; private set; }
-
-        public bool Disposed { get; private set; }
-
-        public AudioFormat Format { get; } = format;
-
-        public string DeviceName => DeviceId ?? "Predeterminado";
-
-        public double ReportedLatencyMilliseconds => 10;
-
-        public event Action<Exception?>? Stopped;
-
-        public void Start() => Started = true;
-
-        public void Stop() => Stopped?.Invoke(null);
-
-        public void Dispose()
-        {
-            Disposed = true;
-            Stopped?.Invoke(null);
-        }
-
-        public void Fail(Exception ex) => Stopped?.Invoke(ex);
-
-        public void Capture(float value, int frames)
-        {
-            var data = new float[frames * Format.Channels];
-            Array.Fill(data, value);
-            OnCapture!(data, discontinuity: false);
-        }
-
-        public void Render(float[] output) => OnRender!(output);
-    }
-
-    private sealed class FakeWatcher : IAudioDeviceWatcher
-    {
-        public event EventHandler<EndpointChange>? Changed;
-
-        public void Raise(EndpointChange change) => Changed?.Invoke(this, change);
     }
 }

@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Sonari.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Sonari.Audio.Core\Sonari.Audio.Core.csproj" />
     <ProjectReference Include="..\Sonari.Audio.Devices\Sonari.Audio.Devices.csproj" />
   </ItemGroup>

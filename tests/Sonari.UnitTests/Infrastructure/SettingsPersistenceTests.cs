@@ -101,6 +101,26 @@ public sealed class SettingsPersistenceTests : IDisposable
     }
 
     [Fact]
+    public async Task SavedSources_SurviveARestartAndInvalidOnesAreDropped()
+    {
+        SettingsService first = CreateService();
+        SavedSource[] sources =
+        [
+            new(SavedSource.ApplicationKind, @"C:\Apps\spotify.exe", "Spotify"),
+            new(SavedSource.SystemAudioKind, null, "Audio del sistema"),
+            new(SavedSource.ApplicationKind, null, "Sin ruta"),
+            new("Desconocido", null, "Tipo de una versión futura"),
+        ];
+
+        await first.SaveAsync(first.Current with { Audio = first.Current.Audio with { Sources = sources } },
+            TestContext.Current.CancellationToken);
+        IReadOnlyList<SavedSource> reloaded = CreateService().Current.Audio.Sources;
+
+        Assert.Equal(sources[..2], reloaded);
+        Assert.DoesNotContain("isValid", File.ReadAllText(_paths.SettingsFile), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void NullSections_InFile_FallBackToDefaults()
     {
         File.WriteAllText(_paths.SettingsFile, """{ "audio": null, "ui": null }""");

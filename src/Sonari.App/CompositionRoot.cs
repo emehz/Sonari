@@ -2,6 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Sonari.Audio.Capture;
+using Sonari.Audio.Capture.Processes;
+using Sonari.Audio.Core.Applications;
 using Sonari.Audio.Core.Devices;
 using Sonari.Audio.Core.Endpoints;
 using Sonari.Audio.Core.Engine;
@@ -47,13 +49,19 @@ internal static class CompositionRoot
         services.AddSingleton<IAudioDeviceWatcher, WasapiDeviceWatcher>();
         services.AddSingleton<ICaptureStreamFactory, WasapiCaptureStreamFactory>();
         services.AddSingleton<IRenderStreamFactory, WasapiRenderStreamFactory>();
+        services.AddSingleton<IProcessCaptureStreamFactory, WasapiProcessCaptureStreamFactory>();
+        services.AddSingleton<IProcessLocator, ProcessLocator>();
+        services.AddSingleton<IAudioApplicationCatalog, AudioApplicationCatalog>();
         services.AddSingleton<IAudioEngine, AudioEngine>();
         services.AddHostedService<AudioEngineLifetime>();
 
         // Presentación. El orden de registro de las páginas es el orden de la navegación.
         services.AddSingleton<IShellIntegration, ShellIntegration>();
+        services.AddSingleton<SourceListPersistence>();
         services.AddSingleton<MixerViewModel>();
         services.AddSingleton<PageViewModel>(sp => sp.GetRequiredService<MixerViewModel>());
+        services.AddSingleton<SourcesViewModel>();
+        services.AddSingleton<PageViewModel>(sp => sp.GetRequiredService<SourcesViewModel>());
         foreach (PlannedPageViewModel page in PlannedPageViewModel.CreateDefaults())
         {
             services.AddSingleton<PageViewModel>(page);

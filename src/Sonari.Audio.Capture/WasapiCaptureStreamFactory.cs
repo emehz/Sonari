@@ -18,57 +18,71 @@ public sealed class WasapiCaptureStreamFactory(ILoggerFactory loggerFactory) : I
     public IAudioStream Open(string? deviceId, AudioFormat format, int bufferMilliseconds, CaptureDataHandler onData)
     {
         ArgumentNullException.ThrowIfNull(onData);
-        return new WasapiCaptureStream(deviceId, format, bufferMilliseconds, onData,
-            loggerFactory.CreateLogger<WasapiCaptureStream>());
-    }
-}
 
-internal sealed class WasapiCaptureStream : IAudioStream
-{
-    private readonly ILogger _logger;
-    private readonly CaptureDataHandler _onData;
-    private readonly MMDeviceEnumerator _enumerator;
-    private readonly MMDevice _device;
-    private readonly WasapiRecorder _recorder;
-    private readonly float[] _silence;
-    private int _stoppedRaised;
-
-    public WasapiCaptureStream(
-        string? deviceId, AudioFormat format, int bufferMilliseconds, CaptureDataHandler onData, ILogger logger)
-    {
-        _logger = logger;
-        _onData = onData;
-        Format = format;
-        _silence = new float[format.SampleRate * format.Channels / 10];
-
-        _enumerator = new MMDeviceEnumerator();
+        var enumerator = new MMDeviceEnumerator();
+        MMDevice? device = null;
+        WasapiRecorder? recorder = null;
         try
         {
-            _device = WasapiEndpointResolver.Resolve(_enumerator, deviceId, DataFlow.Capture);
-            DeviceName = _device.FriendlyName;
-
-            _recorder = new WasapiRecorderBuilder()
-                .WithDevice(_device)
+            device = WasapiEndpointResolver.Resolve(enumerator, deviceId, DataFlow.Capture);
+            recorder = new WasapiRecorderBuilder()
+                .WithDevice(device)
                 .WithSharedMode()
                 .WithEventSync()
                 .WithFormat(WaveFormat.CreateIeeeFloatWaveFormat(format.SampleRate, format.Channels))
                 .WithBufferLength(bufferMilliseconds)
                 .WithMmcssThreadPriority("Pro Audio")
                 .Build();
+
+            return new WasapiRecorderStream(
+                recorder, format, device.FriendlyName, onData, loggerFactory.CreateLogger<WasapiRecorderStream>(),
+                ownedResources: [device, enumerator]);
         }
         catch
         {
-            _device?.Dispose();
-            _enumerator.Dispose();
+            recorder?.Dispose();
+            device?.Dispose();
+            enumerator.Dispose();
             throw;
         }
+    }
+}
 
-        WaveFormat actual = _recorder.WaveFormat;
+/// <summary>
+/// Adapta un <see cref="WasapiRecorder"/> ya configurado (micrófono o loopback de proceso) a <see cref="IAudioStream"/>:
+/// comprueba el formato, traduce las marcas de WASAPI y garantiza un único aviso de parada.
+/// </summary>
+internal sealed class WasapiRecorderStream : IAudioStream
+{
+    private readonly ILogger _logger;
+    private readonly CaptureDataHandler _onData;
+    private readonly WasapiRecorder _recorder;
+    private readonly IDisposable[] _ownedResources;
+    private readonly float[] _silence;
+    private int _stoppedRaised;
+
+    public WasapiRecorderStream(
+        WasapiRecorder recorder,
+        AudioFormat format,
+        string deviceName,
+        CaptureDataHandler onData,
+        ILogger logger,
+        IDisposable[]? ownedResources = null)
+    {
+        _recorder = recorder;
+        _onData = onData;
+        _logger = logger;
+        _ownedResources = ownedResources ?? [];
+        Format = format;
+        DeviceName = deviceName;
+        _silence = new float[format.SampleRate * format.Channels / 10];
+
+        WaveFormat actual = recorder.WaveFormat;
         bool isFloat = actual.Encoding is WaveFormatEncoding.IeeeFloat or WaveFormatEncoding.Extensible;
         if (!isFloat || actual.BitsPerSample != 32 || actual.SampleRate != format.SampleRate || actual.Channels != format.Channels)
         {
-            Dispose();
-            throw new NotSupportedException($"El micrófono entregó un formato inesperado ({actual}).");
+            // El llamador libera el recorder y los recursos al recibir la excepción.
+            throw new NotSupportedException($"La captura entregó un formato inesperado ({actual}).");
         }
 
         _recorder.DataAvailable += OnDataAvailable;
@@ -89,14 +103,12 @@ internal sealed class WasapiCaptureStream : IAudioStream
 
     public void Dispose()
     {
-        if (_recorder is not null)
+        _recorder.DataAvailable -= OnDataAvailable;
+        _recorder.Dispose();
+        foreach (IDisposable resource in _ownedResources)
         {
-            _recorder.DataAvailable -= OnDataAvailable;
-            _recorder.Dispose();
+            resource.Dispose();
         }
-
-        _device?.Dispose();
-        _enumerator.Dispose();
     }
 
     // Hilo de captura de NAudio.

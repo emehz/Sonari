@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Sonari.Audio.Capture\Sonari.Audio.Capture.csproj" />
     <ProjectReference Include="..\..\src\Sonari.Audio.Core\Sonari.Audio.Core.csproj" />
     <ProjectReference Include="..\..\src\Sonari.Audio.Devices\Sonari.Audio.Devices.csproj" />
     <ProjectReference Include="..\..\src\Sonari.Audio.Engine\Sonari.Audio.Engine.csproj" />

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Sonari.Infrastructure.Settings;
 
 /// <summary>
@@ -45,12 +47,32 @@ public sealed record AudioSettings
 
     public string? VirtualOutputDeviceId { get; init; }
 
+    /// <summary>Fuentes de aplicación y de sistema que el usuario añadió al mezclador (el micrófono siempre está).</summary>
+    public IReadOnlyList<SavedSource> Sources { get; init; } = [];
+
     public AudioSettings Normalize() => this with
     {
         SampleRate = SupportedSampleRates.Contains(SampleRate) ? SampleRate : DefaultSampleRate,
         BufferMilliseconds = SupportedBufferMilliseconds.Contains(BufferMilliseconds)
             ? BufferMilliseconds
             : DefaultBufferMilliseconds,
+        Sources = (Sources ?? []).Where(s => s is not null && s.IsValid).ToList(),
+    };
+}
+
+/// <summary>Una fuente guardada. Se identifica por el ejecutable, nunca por el PID (cambia en cada arranque).</summary>
+/// <param name="Kind"><see cref="ApplicationKind"/> o <see cref="SystemAudioKind"/>.</param>
+public sealed record SavedSource(string Kind, string? ExecutablePath, string DisplayName)
+{
+    public const string ApplicationKind = "Application";
+    public const string SystemAudioKind = "SystemAudio";
+
+    [JsonIgnore]
+    public bool IsValid => Kind switch
+    {
+        ApplicationKind => !string.IsNullOrWhiteSpace(ExecutablePath),
+        SystemAudioKind => true,
+        _ => false,
     };
 }
 

@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Sonari.Infrastructure.Storage;
+using Sonari.Presentation.Services;
 using Sonari.Presentation.Views;
 using Serilog;
 using Serilog.Events;
@@ -50,6 +51,9 @@ public partial class App : Application
         {
             _host = CompositionRoot.BuildHost(e.Args, paths);
             _host.Start();
+
+            // Antes de crear la ventana, para que el Mezclador ya muestre las fuentes guardadas.
+            _host.Services.GetRequiredService<SourceListPersistence>().Restore();
 
             MainWindow window = _host.Services.GetRequiredService<MainWindow>();
             MainWindow = window;

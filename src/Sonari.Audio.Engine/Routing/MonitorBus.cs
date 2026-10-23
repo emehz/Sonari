@@ -9,24 +9,43 @@ namespace Sonari.Audio.Engine.Routing;
 /// </summary>
 internal sealed class MonitorBus
 {
-    private readonly MixerChannel[] _channels;
     private readonly BusControl _control;
     private readonly int _channelCount;
     private readonly SmoothedGain _gain = new(0f);
     private readonly float[] _scratch;
+    private MixerChannel[] _channels = [];
     private long _clippedSamples;
 
-    public MonitorBus(BusControl control, int channelCount, params MixerChannel[] channels)
+    public MonitorBus(BusControl control, int channelCount)
     {
         _control = control;
         _channelCount = channelCount;
-        _channels = channels;
         _scratch = new float[MixerChannel.MaxBlockFrames * channelCount];
     }
 
     public PeakMeter OutputMeter { get; } = new();
 
     public long ClippedSamples => Interlocked.Read(ref _clippedSamples);
+
+    public long Resyncs
+    {
+        get
+        {
+            long total = 0;
+            foreach (MixerChannel channel in Volatile.Read(ref _channels))
+            {
+                total += channel.MonitorReader.Resyncs;
+            }
+
+            return total;
+        }
+    }
+
+    /// <summary>
+    /// Sustituye la lista de canales. El hilo de render toma la lista una vez por bloque, así que añadir o quitar una
+    /// fuente no detiene ni bloquea el audio de las demás.
+    /// </summary>
+    public void SetChannels(MixerChannel[] channels) => Volatile.Write(ref _channels, channels);
 
     /// <summary>Hilo de render. No asigna memoria, no bloquea y no lanza excepciones por datos de audio.</summary>
     public void Render(Span<float> output)
@@ -38,11 +57,12 @@ internal sealed class MonitorBus
         }
     }
 
+    /// <summary>Solo con la salida parada.</summary>
     public void ResetForRestart()
     {
         _gain.Target = _control.Linear;
         _gain.Snap();
-        foreach (MixerChannel channel in _channels)
+        foreach (MixerChannel channel in Volatile.Read(ref _channels))
         {
             channel.ResetForRestart();
         }
@@ -51,7 +71,7 @@ internal sealed class MonitorBus
     private void RenderChunk(Span<float> mix)
     {
         mix.Clear();
-        foreach (MixerChannel channel in _channels)
+        foreach (MixerChannel channel in Volatile.Read(ref _channels))
         {
             channel.MixInto(mix, _scratch);
         }

@@ -152,7 +152,7 @@ Cambios de parámetros: valores `volatile float` con rampa por muestra. Cambios 
 
 * Las aplicaciones que usan WASAPI **exclusivo** o ASIO no se pueden capturar.
 * Los procesos protegidos o elevados pueden impedir leer la ruta o el icono. La captura en sí se verificará en la Fase 3 y no se promete.
-* Queda por medir en la Fase 3 si el volumen de la aplicación en el mezclador de Windows afecta a la captura.
+* Medido en la Fase 3: **el volumen de la aplicación en el mezclador de Windows sí afecta a la captura.** Si la silencias o la bajas en Windows, en Sonari llega silenciada o más baja.
 
 ---
 

@@ -65,11 +65,12 @@ public sealed partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void OpenLogFolder() => _shell.OpenFolder(_paths.LogDirectory);
 
-    partial void OnSelectedPageChanged(PageViewModel? value)
+    partial void OnSelectedPageChanged(PageViewModel? oldValue, PageViewModel? newValue)
     {
-        if (value is not null)
+        oldValue?.OnNavigatedFrom();
+        if (newValue is not null)
         {
-            _ = NavigateAsync(value);
+            _ = NavigateAsync(newValue);
         }
     }
 

@@ -17,4 +17,9 @@ public abstract class PageViewModel(string key, string title, string glyph, stri
 
     /// <summary>Se llama en el hilo de UI cada vez que la página pasa a ser visible.</summary>
     public virtual Task OnNavigatedToAsync() => Task.CompletedTask;
+
+    /// <summary>Se llama en el hilo de UI cuando la página deja de verse (p. ej. para parar sondeos periódicos).</summary>
+    public virtual void OnNavigatedFrom()
+    {
+    }
 }
