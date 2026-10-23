@@ -1,0 +1,11 @@
+* text=auto
+*.cs     text diff=csharp
+*.xaml   text
+*.csproj text
+*.sln    text eol=crlf
+*.props  text
+*.md     text
+*.png    binary
+*.ico    binary
+*.wav    binary
+*.mp3    binary

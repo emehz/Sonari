@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Pruebas que no necesitan hardware de audio. xUnit v3: el proyecto de pruebas es un ejecutable. -->
+  <PropertyGroup>
+    <TargetFramework>$(OndaNet)-windows</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>OndaMix.UnitTests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OndaMix.Audio.Core\OndaMix.Audio.Core.csproj" />
+    <ProjectReference Include="..\..\src\OndaMix.Audio.Devices\OndaMix.Audio.Devices.csproj" />
+    <ProjectReference Include="..\..\src\OndaMix.Audio.Engine\OndaMix.Audio.Engine.csproj" />
+    <ProjectReference Include="..\..\src\OndaMix.Infrastructure\OndaMix.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

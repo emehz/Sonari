@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Capa de endpoints WASAPI compartida por Capture, Output y VirtualAudio. Única capa (junto con ellas) que conoce NAudio. -->
+  <PropertyGroup>
+    <TargetFramework>$(OndaNet)-windows</TargetFramework>
+    <RootNamespace>OndaMix.Audio.Devices</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio.Wasapi" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OndaMix.Audio.Core\OndaMix.Audio.Core.csproj" />
+  </ItemGroup>
+
+</Project>
