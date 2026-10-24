@@ -13,7 +13,7 @@ public class DriftCompensatingReaderTests
     private static (SpscRingBuffer<float> Ring, DriftCompensatingReader Reader) Create()
     {
         var ring = new SpscRingBuffer<float>(SampleRate * Channels);
-        var reader = new DriftCompensatingReader(ring, Channels, SampleRate, MixerChannel.MaxBlockFrames, TargetFrames);
+        var reader = new DriftCompensatingReader(ring, Channels, SampleRate, SourceFeed.MaxBlockFrames, TargetFrames);
         return (ring, reader);
     }
 

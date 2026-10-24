@@ -16,7 +16,7 @@ internal sealed class ProcessCaptureRunner
     private static readonly TimeSpan RetryAfterFailure = TimeSpan.FromSeconds(3);
 
     private readonly SourceChannel _source;
-    private readonly MixerChannel _mixer;
+    private readonly SourceFeed _feed;
     private readonly AudioFormat _format;
     private readonly IProcessCaptureStreamFactory _factory;
     private readonly IProcessLocator _locator;
@@ -28,14 +28,14 @@ internal sealed class ProcessCaptureRunner
 
     public ProcessCaptureRunner(
         SourceChannel source,
-        MixerChannel mixer,
+        SourceFeed feed,
         AudioFormat format,
         IProcessCaptureStreamFactory factory,
         IProcessLocator locator,
         ILogger logger)
     {
         _source = source;
-        _mixer = mixer;
+        _feed = feed;
         _format = format;
         _factory = factory;
         _locator = locator;
@@ -97,7 +97,7 @@ internal sealed class ProcessCaptureRunner
         try
         {
             // En modo sistema se captura todo excepto el árbol de Sonari (evita que el monitoreo vuelva a entrar).
-            stream = await _factory.OpenAsync(processId, includeProcessTree: !IsSystemAudio, _format, _mixer.OnCaptured, token)
+            stream = await _factory.OpenAsync(processId, includeProcessTree: !IsSystemAudio, _format, _feed.OnCaptured, token)
                 .ConfigureAwait(false);
             stream.Stopped += ex => stopped.TrySetResult(ex);
             stream.Start();

@@ -2,7 +2,7 @@
 
 Mezclador de audio en tiempo real para Windows: micrófono, aplicaciones concretas, audio del sistema y sonidos, todo enviado a un micrófono virtual y con monitoreo independiente por auriculares.
 
-> **Estado: Fase 4 (mezclador y sonidos).** Micrófono, aplicaciones, audio del sistema y panel de sonidos, cada uno como canal independiente con ganancia, balance, silencio y medidores, y un limitador que evita la saturación. Todavía no hay micrófono virtual (Fase 5), efectos de voz (Fase 6) ni escenas y atajos (Fase 7). Detalles en la carpeta [docs](docs).
+> **Estado: Fase 5 (micrófono virtual).** Micrófono, aplicaciones, audio del sistema y panel de sonidos mezclados en dos salidas independientes: el **micrófono virtual** (lo que oyen los demás, a través de un cable virtual como VB-CABLE) y el **monitoreo** (lo que oyes tú). Todavía no hay efectos de voz (Fase 6) ni escenas y atajos (Fase 7). Cómo instalar el cable y configurar Discord: [docs/05-fase-5-microfono-virtual.md](docs/05-fase-5-microfono-virtual.md).
 
 ## Requisitos
 
@@ -11,7 +11,7 @@ Mezclador de audio en tiempo real para Windows: micrófono, aplicaciones concret
 | Windows | 10 versión 2004 (build 19041) o posterior, 64 bits. La captura por aplicación necesita esta versión |
 | IDE | **Visual Studio 2026 Community** (18.x) con la carga de trabajo «Desarrollo de escritorio de .NET» |
 | SDK | .NET 10 (se instala con la carga de trabajo anterior) |
-| Micrófono virtual | Hasta que Sonari tenga su propio driver (después de la Fase 5): un cable virtual de terceros como [VB-CABLE](https://vb-audio.com/Cable/). Cada usuario lo instala por su cuenta |
+| Micrófono virtual | Hasta que Sonari tenga su propio driver: un cable virtual de terceros como [VB-CABLE](https://vb-audio.com/Cable/). Cada usuario lo instala por su cuenta ([guía](docs/05-fase-5-microfono-virtual.md#instalar-vb-cable-una-vez-por-pc)) |
 
 ¿Por qué no Visual Studio 2022? Porque solo puede compilar hasta .NET 9, y tanto .NET 8 como .NET 9 dejan de tener soporte el 10/11/2026. Si lo necesitas de forma temporal, cambia `SonariNet` a `net9.0` en [Directory.Build.props](Directory.Build.props).
 
@@ -48,11 +48,13 @@ src/
   Sonari.Infrastructure Ajustes en JSON con escritura atómica y rutas
 tests/
   Sonari.UnitTests      Pruebas que no necesitan hardware de audio
+driver/                 Driver de audio propio en C++ (WDK), en desarrollo. Ver driver/README.md
 docs/
   01-viabilidad-y-arquitectura.md   Diseño completo, riesgos y plan por fases
   02-fase-2-motor-basico.md         Motor de audio: decisiones, pruebas y limitaciones
   03-fase-3-captura-por-aplicacion.md  Captura por aplicación y audio del sistema
   04-fase-4-mezclador-y-sonidos.md     Limitador, balance, silencio global y panel de sonidos
+  05-fase-5-microfono-virtual.md       Micrófono virtual, VB-CABLE y Discord
 ```
 
 `dotnet test` usa Microsoft.Testing.Platform (configurado en `global.json`), como exige xUnit v3 con el SDK de .NET 10. El Explorador de pruebas de Visual Studio funciona sin cambios.
@@ -77,4 +79,4 @@ Sonari nunca graba ni guarda audio sin una acción explícita del usuario, y sol
 
 ## Licencia
 
-Por decidir.
+Por decidir. El driver de `driver/` deriva de un ejemplo de Microsoft y se distribuye bajo la Microsoft Public License (MS-PL), incluida en [driver/LICENSE](driver/LICENSE).

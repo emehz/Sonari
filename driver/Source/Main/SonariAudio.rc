@@ -1,0 +1,52 @@
+/*++
+
+Portions Copyright (c) Microsoft Corporation All Rights Reserved
+
+Module Name:
+
+    SonariAudio.rc
+
+Abstract:
+
+    Version information for the Sonari virtual audio driver.
+
+--*/
+
+#include <windows.h>
+
+#define SONARI_VERSION          0,1,0,0
+#define SONARI_VERSION_STR      "0.1.0.0"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     SONARI_VERSION
+PRODUCTVERSION  SONARI_VERSION
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+#ifdef DBG
+FILEFLAGS       VS_FF_DEBUG
+#else
+FILEFLAGS       0
+#endif
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_DRV
+FILESUBTYPE     VFT2_DRV_SOUND
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName",      "Sonari"
+            VALUE "FileDescription",  "Sonari Virtual Audio Driver"
+            VALUE "FileVersion",      SONARI_VERSION_STR
+            VALUE "InternalName",     "SonariAudio.sys"
+            VALUE "LegalCopyright",   "Sonari contributors. Based on Microsoft SimpleAudioSample (MS-PL)."
+            VALUE "OriginalFilename", "SonariAudio.sys"
+            VALUE "ProductName",      "Sonari"
+            VALUE "ProductVersion",   SONARI_VERSION_STR
+        END
+    END
+
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    Corta la herencia del Directory.Build.props de la raíz de Sonari (propiedades de .NET que no aplican a un driver)
+    y fija la versión mínima de Windows para la que se compila el driver.
+  -->
+  <PropertyGroup>
+    <!-- Windows 10 2004 (build 19041): el mismo mínimo que Sonari. Las cabeceras ocultan las APIs posteriores,
+         así que usar una función exclusiva de Windows 11 da error de compilación en vez de fallar en el PC del usuario. -->
+    <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
+  </PropertyGroup>
+</Project>

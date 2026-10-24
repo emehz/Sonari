@@ -39,9 +39,10 @@ public sealed partial class DevicesViewModel : PageViewModel
     public ObservableCollection<AudioEndpointInfo> Outputs { get; } = [];
 
     public string VirtualDeviceSummary => HasVirtualDevice
-        ? "Hay un cable virtual de terceros instalado (marcado abajo). Sonari lo usará como salida en la Fase 5."
-        : "No se detectó ningún cable virtual. Hará falta uno (p. ej. VB-CABLE) en la Fase 5: " +
-          "Sonari todavía no instala su propio driver.";
+        ? "Hay un cable virtual instalado (marcado abajo). Elige su entrada en el Mezclador, en «Micrófono virtual», " +
+          "y su salida como micrófono en Discord."
+        : "No hay ningún cable virtual instalado. Instala VB-CABLE (gratuito para uso personal) desde vb-audio.com/Cable: " +
+          "descomprime el ZIP, ejecuta VBCABLE_Setup_x64.exe como administrador y reinicia. Sonari todavía no instala su propio driver.";
 
     public override async Task OnNavigatedToAsync()
     {

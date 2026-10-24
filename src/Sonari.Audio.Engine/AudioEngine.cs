@@ -11,12 +11,17 @@ using Sonari.Audio.Engine.Routing;
 namespace Sonari.Audio.Engine;
 
 /// <summary>
-/// Motor de audio: micrófono y fuentes de aplicación/sistema → compensación de deriva → bus de monitoreo → auriculares.
+/// Motor de audio con dos mezclas independientes:
+/// <list type="bullet">
+/// <item><b>Monitoreo</b>: lo que oyes por los auriculares.</item>
+/// <item><b>Micrófono virtual</b> (opcional): lo que oyen los demás, escrito en la entrada de un cable virtual.</item>
+/// </list>
 /// <para>
-/// Un supervisor abre el micrófono y la salida y los vuelve a abrir si fallan, desaparecen o cambia el predeterminado
-/// de Windows. Cada fuente de aplicación tiene su propio bucle de captura (<see cref="ProcessCaptureRunner"/>), de modo
-/// que añadir, quitar o perder una aplicación no interrumpe al resto. Los controles de las fuentes viven fuera de los
-/// arranques, así que ganancias y envíos se conservan.
+/// Cada fuente (micrófono, aplicaciones, sistema, sonidos) envía por separado a cada mezcla, y cada mezcla la marca el
+/// reloj de su propio dispositivo. Un supervisor abre micrófono y monitoreo y los reabre si fallan, desaparecen o cambia
+/// el predeterminado de Windows. La salida virtual es opcional: si falta o falla, el resto sigue funcionando y se
+/// reintenta por separado, sin cortar el monitoreo. Cada aplicación tiene su propio bucle de captura
+/// (<see cref="ProcessCaptureRunner"/>). Los controles viven fuera de los arranques, así que ganancias y envíos se conservan.
 /// </para>
 /// </summary>
 public sealed class AudioEngine : IAudioEngine
@@ -34,10 +39,11 @@ public sealed class AudioEngine : IAudioEngine
     private readonly SourceChannel _soundsSource;
     private readonly SoundPlayer _soundPlayer = new();
     private readonly BusControl _monitor = new();
+    private readonly BusControl _virtual = new();
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private readonly SemaphoreSlim _wake = new(0, int.MaxValue);
 
-    // Protege _sources, _runners, _monitorBus y _running frente a añadir/quitar fuentes desde la UI durante un arranque.
+    // Protege _sources, _runners, los buses y _running frente a añadir/quitar fuentes desde la UI durante un arranque.
     private readonly object _sourcesLock = new();
     private readonly Dictionary<Guid, ProcessCaptureRunner> _runners = [];
     private SourceChannel[] _sources;
@@ -46,15 +52,21 @@ public sealed class AudioEngine : IAudioEngine
     private EngineStatus _status = EngineStatus.Stopped;
     private EngineOptions? _options;
     private int _targetFrames;
-    private MonitorBus? _monitorBus;
+    private MixBus? _monitorBus;
+    private MixBus? _virtualBus;
     private IAudioStream? _capture;
     private IAudioStream? _render;
+    private IAudioStream? _virtualRender;
+    private string? _virtualMessage;
     private CancellationTokenSource? _runCts;
     private Task? _supervisor;
     private GCLatencyMode? _previousGcMode;
     private int _generation;
+    private int _virtualGeneration;
     private int _consecutiveOpenFailures;
+    private int _consecutiveVirtualFailures;
     private int _streamFailed;
+    private int _virtualFailed;
     private int _defaultDeviceChanged;
     private int _globalMuted;
 
@@ -118,6 +130,8 @@ public sealed class AudioEngine : IAudioEngine
 
     public IBusControl Monitor => _monitor;
 
+    public IBusControl VirtualMicrophone => _virtual;
+
     public bool SupportsProcessCapture => _processCaptureFactory.IsSupported;
 
     public async Task StartAsync(EngineOptions options, CancellationToken cancellationToken = default)
@@ -130,22 +144,27 @@ public sealed class AudioEngine : IAudioEngine
 
             SetStatus(new EngineStatus(EngineState.Starting, "Abriendo dispositivos…"));
             _logger.LogInformation(
-                "Arrancando motor: {Format}, bloque {Block} ms, entrada {Input}, monitoreo {Monitor}",
+                "Arrancando motor: {Format}, bloque {Block} ms, entrada {Input}, monitoreo {Monitor}, micrófono virtual {Virtual}",
                 options.Format, options.BlockMilliseconds, options.InputDeviceId ?? "(predeterminada)",
-                options.MonitorDeviceId ?? "(predeterminada)");
+                options.MonitorDeviceId ?? "(predeterminada)", options.VirtualOutputDeviceId ?? "(desactivado)");
 
             lock (_sourcesLock)
             {
                 Volatile.Write(ref _options, options);
                 _targetFrames = options.Format.FramesFor(TimeSpan.FromMilliseconds(TargetBufferMilliseconds(options)));
-                _monitorBus = new MonitorBus(_monitor, options.Format, () => IsGlobalMuted);
+                _monitorBus = new MixBus(BusKind.Monitor, _monitor, options.Format, () => IsGlobalMuted);
+                _virtualBus = options.VirtualOutputDeviceId is null
+                    ? null
+                    : new MixBus(BusKind.Virtual, _virtual, options.Format, () => IsGlobalMuted);
+                _virtualMessage = options.VirtualOutputDeviceId is null ? "Micrófono virtual desactivado." : null;
                 _soundPlayer.Configure(options.Format);
+
                 foreach (SourceChannel source in _sources)
                 {
-                    source.Mixer = CreateMixer(source);
+                    source.Feed = CreateFeed(source);
                 }
 
-                PublishBusChannels();
+                PublishBusInputs();
                 _running = true;
             }
 
@@ -237,7 +256,7 @@ public sealed class AudioEngine : IAudioEngine
             _runners.Remove(source.Id, out runner);
             if (_running)
             {
-                PublishBusChannels();
+                PublishBusInputs();
             }
         }
 
@@ -252,11 +271,20 @@ public sealed class AudioEngine : IAudioEngine
 
     public EngineMetrics ReadMetrics()
     {
-        MonitorBus? bus = Volatile.Read(ref _monitorBus);
-        return bus is null
-            ? default
-            : new EngineMetrics(
-                bus.OutputMeter.ReadAndReset(), bus.Limiter.ReadAndResetGainReductionDb(), bus.ClippedSamples, bus.Resyncs);
+        MixBus? monitor = Volatile.Read(ref _monitorBus);
+        if (monitor is null)
+        {
+            return default;
+        }
+
+        MixBus? virtualBus = Volatile.Read(ref _virtualBus);
+        return new EngineMetrics(
+            MonitorOutput: monitor.OutputMeter.ReadAndReset(),
+            MonitorGainReductionDb: monitor.Limiter.ReadAndResetGainReductionDb(),
+            ClippedSamples: monitor.ClippedSamples + (virtualBus?.ClippedSamples ?? 0),
+            Resyncs: monitor.Resyncs + (virtualBus?.Resyncs ?? 0),
+            VirtualOutput: virtualBus?.OutputMeter.ReadAndReset() ?? default,
+            VirtualGainReductionDb: virtualBus?.Limiter.ReadAndResetGainReductionDb() ?? 0f);
     }
 
     public async ValueTask DisposeAsync()
@@ -278,6 +306,8 @@ public sealed class AudioEngine : IAudioEngine
 
     internal static int CaptureBufferMilliseconds(EngineOptions options) => Math.Max(50, options.BlockMilliseconds * 4);
 
+    private static bool IsProcessSource(SourceKind kind) => kind is SourceKind.Application or SourceKind.SystemAudio;
+
     private void AddSource(SourceChannel source)
     {
         lock (_sourcesLock)
@@ -285,8 +315,8 @@ public sealed class AudioEngine : IAudioEngine
             Volatile.Write(ref _sources, [.. _sources, source]);
             if (_running)
             {
-                source.Mixer = CreateMixer(source);
-                PublishBusChannels();
+                source.Feed = CreateFeed(source);
+                PublishBusInputs();
                 StartRunner(source);
             }
         }
@@ -295,21 +325,34 @@ public sealed class AudioEngine : IAudioEngine
         RaiseSourcesChanged();
     }
 
-    private static bool IsProcessSource(SourceKind kind) => kind is SourceKind.Application or SourceKind.SystemAudio;
+    /// <summary>Con <see cref="_sourcesLock"/> tomado y las opciones fijadas.</summary>
+    private SourceFeed CreateFeed(SourceChannel source)
+    {
+        var feed = new SourceFeed(
+            source.Control,
+            _options!.Format,
+            _targetFrames,
+            source.Kind,
+            withVirtualBus: _virtualBus is not null,
+            generator: source.Kind == SourceKind.SoundPlayer ? _soundPlayer.Render : null);
 
-    private ChannelStrip CreateMixer(SourceChannel source) => source.Kind == SourceKind.SoundPlayer
-        ? new GeneratorChannel(source.Control, _options!.Format.Channels, _soundPlayer.Render)
-        : new MixerChannel(source.Control, _options!.Format, _targetFrames, isIntermittent: source.Kind != SourceKind.Microphone);
+        feed.PrimaryBus = _virtualRender is not null ? BusKind.Virtual : BusKind.Monitor;
+        return feed;
+    }
 
     /// <summary>Con <see cref="_sourcesLock"/> tomado.</summary>
-    private void PublishBusChannels() =>
-        _monitorBus?.SetChannels(_sources.Select(s => s.Mixer).OfType<ChannelStrip>().ToArray());
+    private void PublishBusInputs()
+    {
+        SourceFeed[] feeds = _sources.Select(s => s.Feed).OfType<SourceFeed>().ToArray();
+        _monitorBus?.SetInputs(feeds.Select(f => f.MonitorInput).ToArray());
+        _virtualBus?.SetInputs(feeds.Select(f => f.VirtualInput!).ToArray());
+    }
 
     /// <summary>Con <see cref="_sourcesLock"/> tomado y el motor en marcha.</summary>
     private void StartRunner(SourceChannel source)
     {
         var runner = new ProcessCaptureRunner(
-            source, (MixerChannel)source.Mixer!, _options!.Format, _processCaptureFactory, _processLocator, _logger);
+            source, source.Feed!, _options!.Format, _processCaptureFactory, _processLocator, _logger);
         _runners[source.Id] = runner;
         runner.Start();
     }
@@ -325,7 +368,7 @@ public sealed class AudioEngine : IAudioEngine
             _logger.LogWarning(ex, "Error al detener la captura de {Source}", source);
         }
 
-        source.Mixer = null;
+        source.Feed = null;
         source.SetStatus(SourceStatus.Stopped, "Motor detenido");
     }
 
@@ -379,12 +422,13 @@ public sealed class AudioEngine : IAudioEngine
         {
             foreach (SourceChannel source in _sources)
             {
-                source.Mixer = null;
+                source.Feed = null;
             }
 
             // Con el render ya parado: lo que sonaba se descarta para que la UI no muestre reproducciones fantasma.
             _soundPlayer.Configure(_options?.Format ?? AudioFormat.Default);
             Volatile.Write(ref _monitorBus, null);
+            Volatile.Write(ref _virtualBus, null);
             Volatile.Write(ref _options, null);
         }
 
@@ -405,10 +449,12 @@ public sealed class AudioEngine : IAudioEngine
     {
         while (!token.IsCancellationRequested)
         {
-            bool healthy = _capture is not null && _render is not null && Volatile.Read(ref _streamFailed) == 0;
+            bool mainHealthy = _capture is not null && _render is not null && Volatile.Read(ref _streamFailed) == 0;
+            bool virtualPending = _virtualBus is not null && (_virtualRender is null || Volatile.Read(ref _virtualFailed) != 0);
             try
             {
-                await _wake.WaitAsync(healthy ? Timeout.InfiniteTimeSpan : RetryInterval, token).ConfigureAwait(false);
+                await _wake.WaitAsync(mainHealthy && !virtualPending ? Timeout.InfiniteTimeSpan : RetryInterval, token)
+                    .ConfigureAwait(false);
 
                 // Windows envía ráfagas de avisos por un solo cambio (uno por rol): se agrupan.
                 await Task.Delay(DeviceChangeDebounce, token).ConfigureAwait(false);
@@ -425,11 +471,12 @@ public sealed class AudioEngine : IAudioEngine
 
             bool failed = Interlocked.Exchange(ref _streamFailed, 0) != 0;
             bool defaultChanged = Interlocked.Exchange(ref _defaultDeviceChanged, 0) != 0;
-            healthy = _capture is not null && _render is not null;
+            bool virtualFailed = Interlocked.Exchange(ref _virtualFailed, 0) != 0;
+            mainHealthy = _capture is not null && _render is not null;
 
-            if (failed || !healthy || defaultChanged)
+            if (failed || !mainHealthy || defaultChanged)
             {
-                if (defaultChanged && healthy && !failed)
+                if (defaultChanged && mainHealthy && !failed)
                 {
                     _logger.LogInformation("Cambió el dispositivo predeterminado de Windows; reabriendo");
                 }
@@ -437,28 +484,37 @@ public sealed class AudioEngine : IAudioEngine
                 CloseStreams();
                 TryOpenStreams();
             }
+            else if (_virtualBus is not null && (virtualFailed || _virtualRender is null))
+            {
+                // Solo la salida virtual: el micrófono y los auriculares siguen sonando sin cortes.
+                CloseVirtual();
+                TryOpenVirtual();
+                PublishStatus();
+            }
         }
     }
 
     private bool TryOpenStreams()
     {
         EngineOptions options = _options ?? throw new InvalidOperationException("Motor sin configurar.");
-        MonitorBus bus = _monitorBus!;
-        MixerChannel micMixer = (MixerChannel)_microphone.Mixer!;
+        MixBus monitorBus = _monitorBus!;
+        SourceFeed micFeed = _microphone.Feed!;
         int generation = Interlocked.Increment(ref _generation);
         Volatile.Write(ref _streamFailed, 0);
-        bus.ResetForRestart();
+        SetPrimaryBus(BusKind.Monitor);
+        monitorBus.ResetForRestart();
 
         try
         {
             _render = _renderFactory.Open(
-                options.MonitorDeviceId, options.Format, RenderLatencyMilliseconds(options), bus.Render);
+                options.MonitorDeviceId, options.Format, RenderLatencyMilliseconds(options), monitorBus.Render);
             _render.Stopped += ex => OnStreamStopped(generation, "salida de monitoreo", ex);
 
             _capture = _captureFactory.Open(
-                options.InputDeviceId, options.Format, CaptureBufferMilliseconds(options), micMixer.OnCaptured);
+                options.InputDeviceId, options.Format, CaptureBufferMilliseconds(options), micFeed.OnCaptured);
             _capture.Stopped += ex => OnStreamStopped(generation, "micrófono", ex);
 
+            monitorBus.SetActive(true);
             _render.Start();
             _capture.Start();
 
@@ -469,14 +525,10 @@ public sealed class AudioEngine : IAudioEngine
 
             _microphone.SetStatus(SourceStatus.Active, _capture.DeviceName);
             _soundsSource.SetStatus(SourceStatus.Active, "Listo");
-            SetStatus(new EngineStatus(
-                EngineState.Running,
-                "En marcha",
-                _capture.DeviceName,
-                _render.DeviceName,
-                _capture.ReportedLatencyMilliseconds,
-                _render.ReportedLatencyMilliseconds));
             _consecutiveOpenFailures = 0;
+
+            TryOpenVirtual();
+            PublishStatus();
             return true;
         }
         catch (Exception ex)
@@ -496,11 +548,105 @@ public sealed class AudioEngine : IAudioEngine
         }
     }
 
+    /// <summary>
+    /// Abre la salida del micrófono virtual sin tocar micrófono ni monitoreo. Si falla, el motor sigue y el supervisor
+    /// reintenta. Con la salida virtual en marcha, los sonidos se generan a su ritmo para que no dependan de los auriculares.
+    /// </summary>
+    private void TryOpenVirtual()
+    {
+        MixBus? virtualBus = _virtualBus;
+        EngineOptions? options = _options;
+        if (virtualBus is null || options?.VirtualOutputDeviceId is null)
+        {
+            return;
+        }
+
+        int generation = Interlocked.Increment(ref _virtualGeneration);
+        Volatile.Write(ref _virtualFailed, 0);
+        IAudioStream? stream = null;
+        try
+        {
+            virtualBus.ResetForRestart();
+            stream = _renderFactory.Open(
+                options.VirtualOutputDeviceId, options.Format, RenderLatencyMilliseconds(options), virtualBus.Render);
+
+            // Si el monitoreo acaba en el mismo dispositivo (p. ej. Windows tiene el cable como salida predeterminada),
+            // los demás oirían tu monitoreo: se rechaza en vez de mezclar las dos cosas.
+            if (_render is not null && string.Equals(stream.DeviceName, _render.DeviceName, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"El monitoreo está saliendo por «{stream.DeviceName}», el mismo dispositivo que el micrófono virtual. " +
+                    "Elige otros auriculares para el monitoreo o cambia la salida predeterminada de Windows.");
+            }
+
+            stream.Stopped += ex => OnVirtualStopped(generation, ex);
+            virtualBus.SetActive(true);
+            SetPrimaryBus(BusKind.Virtual);
+            stream.Start();
+            _virtualRender = stream;
+            _virtualMessage = null;
+            _consecutiveVirtualFailures = 0;
+            _logger.LogInformation("Micrófono virtual en marcha: «{Device}» ({Latency} ms)", stream.DeviceName, stream.ReportedLatencyMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(
+                _consecutiveVirtualFailures++ == 0 ? LogLevel.Warning : LogLevel.Debug,
+                ex,
+                "No se pudo abrir la salida del micrófono virtual (intento {Attempt})",
+                _consecutiveVirtualFailures);
+            virtualBus.SetActive(false);
+            SetPrimaryBus(BusKind.Monitor);
+            DisposeQuietly(ref stream, "micrófono virtual");
+            _virtualMessage = $"Micrófono virtual no disponible: {ex.Message}";
+        }
+    }
+
+    private void CloseVirtual()
+    {
+        SetPrimaryBus(BusKind.Monitor);
+        _virtualBus?.SetActive(false);
+        DisposeQuietly(ref _virtualRender, "micrófono virtual");
+    }
+
     private void CloseStreams()
     {
-        // Primero la captura (productor) y luego la salida (consumidor).
+        // Primero la captura (productor) y luego las salidas (consumidores).
+        _monitorBus?.SetActive(false);
         DisposeQuietly(ref _capture, "micrófono");
+        CloseVirtual();
         DisposeQuietly(ref _render, "salida de monitoreo");
+    }
+
+    /// <summary>Decide qué mezcla genera los sonidos. El reproductor protege contra dos hilos generando a la vez.</summary>
+    private void SetPrimaryBus(BusKind bus)
+    {
+        SourceFeed? feed = _soundsSource.Feed;
+        if (feed is not null)
+        {
+            feed.PrimaryBus = bus;
+        }
+    }
+
+    private void PublishStatus()
+    {
+        IAudioStream? capture = _capture;
+        IAudioStream? render = _render;
+        if (capture is null || render is null)
+        {
+            return;
+        }
+
+        IAudioStream? virtualRender = _virtualRender;
+        SetStatus(new EngineStatus(
+            EngineState.Running,
+            "En marcha",
+            capture.DeviceName,
+            render.DeviceName,
+            capture.ReportedLatencyMilliseconds,
+            render.ReportedLatencyMilliseconds,
+            virtualRender?.DeviceName,
+            virtualRender is null ? _virtualMessage : null));
     }
 
     private void DisposeQuietly(ref IAudioStream? stream, string role)
@@ -535,6 +681,19 @@ public sealed class AudioEngine : IAudioEngine
         Volatile.Write(ref _streamFailed, 1);
         _microphone.SetStatus(SourceStatus.Waiting, $"Se perdió el {role}. Reintentando…");
         SetStatus(new EngineStatus(EngineState.Recovering, $"Se perdió el {role}. Reintentando…"));
+        _wake.Release();
+    }
+
+    private void OnVirtualStopped(int generation, Exception? exception)
+    {
+        if (exception is null || generation != Volatile.Read(ref _virtualGeneration))
+        {
+            return;
+        }
+
+        _logger.LogWarning(exception, "La salida del micrófono virtual se detuvo inesperadamente");
+        _virtualMessage = "Se perdió la salida del micrófono virtual. Reintentando…";
+        Volatile.Write(ref _virtualFailed, 1);
         _wake.Release();
     }
 

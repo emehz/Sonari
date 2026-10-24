@@ -13,6 +13,7 @@ internal sealed class ChannelControl : IChannelControl
     private float _balance;
     private int _muted;
     private int _sendToMonitor;
+    private int _sendToVirtual = 1;
 
     public float Balance
     {
@@ -51,6 +52,15 @@ internal sealed class ChannelControl : IChannelControl
         get => Volatile.Read(ref _sendToMonitor) != 0;
         set => Volatile.Write(ref _sendToMonitor, value ? 1 : 0);
     }
+
+    /// <summary>Por defecto activado: enviar al micrófono virtual es para lo que se añaden las fuentes.</summary>
+    public bool SendToVirtual
+    {
+        get => Volatile.Read(ref _sendToVirtual) != 0;
+        set => Volatile.Write(ref _sendToVirtual, value ? 1 : 0);
+    }
+
+    public bool SendsTo(BusKind bus) => bus == BusKind.Monitor ? SendToMonitor : SendToVirtual;
 
     /// <summary>Ganancia lineal del fader, con el silencio ya aplicado. El mínimo del fader equivale a silencio total.</summary>
     public float FaderLinear => IsMuted || GainDb <= MinGainDb ? 0f : Decibels.ToLinear(GainDb);

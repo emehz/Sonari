@@ -15,20 +15,29 @@ public enum EngineState
 
 /// <param name="InputDeviceId"><c>null</c> = micrófono predeterminado de Windows (y lo sigue si cambia).</param>
 /// <param name="MonitorDeviceId"><c>null</c> = salida predeterminada de Windows (y la sigue si cambia).</param>
+/// <param name="VirtualOutputDeviceId">
+/// Salida donde se escribe la mezcla del micrófono virtual (la entrada de un cable virtual, p. ej. «CABLE Input»).
+/// <c>null</c> = sin micrófono virtual. Nunca sigue al predeterminado de Windows: eso mandaría la mezcla a tus altavoces.
+/// </param>
 public sealed record EngineOptions(
     AudioFormat Format,
     int BlockMilliseconds,
     string? InputDeviceId,
-    string? MonitorDeviceId);
+    string? MonitorDeviceId,
+    string? VirtualOutputDeviceId = null);
 
 /// <summary>Estado legible del motor. Se publica entero en cada cambio (no en cada bloque de audio).</summary>
+/// <param name="VirtualDeviceName">Salida del micrófono virtual en uso, o <c>null</c> si no está activo.</param>
+/// <param name="VirtualMessage">Por qué el micrófono virtual no está activo (no configurado, no encontrado…), o <c>null</c>.</param>
 public sealed record EngineStatus(
     EngineState State,
     string Message,
     string? InputDeviceName = null,
     string? MonitorDeviceName = null,
     double? InputLatencyMilliseconds = null,
-    double? OutputLatencyMilliseconds = null)
+    double? OutputLatencyMilliseconds = null,
+    string? VirtualDeviceName = null,
+    string? VirtualMessage = null)
 {
     public static EngineStatus Stopped { get; } = new(EngineState.Stopped, "Motor detenido");
 }
@@ -50,7 +59,9 @@ public readonly record struct EngineMetrics(
     StereoPeak MonitorOutput,
     float MonitorGainReductionDb,
     long ClippedSamples,
-    long Resyncs);
+    long Resyncs,
+    StereoPeak VirtualOutput = default,
+    float VirtualGainReductionDb = 0f);
 
 public interface IChannelControl
 {
@@ -62,6 +73,9 @@ public interface IChannelControl
     float Balance { get; set; }
 
     bool SendToMonitor { get; set; }
+
+    /// <summary>Si la fuente entra en la mezcla del micrófono virtual (lo que oyen los demás).</summary>
+    bool SendToVirtual { get; set; }
 }
 
 public interface IBusControl
@@ -109,6 +123,9 @@ public interface IAudioEngine : IAsyncDisposable
     IReadOnlyList<ISourceChannel> Sources { get; }
 
     IBusControl Monitor { get; }
+
+    /// <summary>Volumen y silencio de la mezcla que se envía al micrófono virtual, independientes del monitoreo.</summary>
+    IBusControl VirtualMicrophone { get; }
 
     /// <summary>Si es falso, no se pueden añadir fuentes de aplicación ni de sistema.</summary>
     bool SupportsProcessCapture { get; }

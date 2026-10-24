@@ -77,7 +77,9 @@
                   ToolTip="Doble clic para centrar" MouseDoubleClick="OnBalanceDoubleClick"
                   AutomationProperties.Name="Balance del canal" />
 
-          <ToggleButton Style="{StaticResource Switch}" Margin="0,14,0,0" IsChecked="{Binding SendToMonitor}"
+          <ToggleButton Style="{StaticResource Switch}" Margin="0,14,0,0" IsChecked="{Binding SendToVirtual}"
+                        Content="Enviar al micrófono virtual" ToolTip="Lo oirán los demás (Discord, juegos…)" />
+          <ToggleButton Style="{StaticResource Switch}" Margin="0,10,0,0" IsChecked="{Binding SendToMonitor}"
                         Content="Enviar al monitoreo" ToolTip="{Binding MonitorHint}" />
           <TextBlock Text="{Binding MonitorHint}" Style="{StaticResource Text.Caption}" Margin="46,4,0,0"
                      TextWrapping="Wrap" TextTrimming="None" />
@@ -168,6 +170,10 @@
       <!-- Dispositivos -->
       <Border Style="{StaticResource Card}" Margin="0,16,16,0">
         <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="16" />
@@ -188,7 +194,26 @@
                   Command="{Binding RefreshDevicesCommand}" ToolTip="Volver a leer los dispositivos">
             <TextBlock Text="&#xE72C;" Style="{StaticResource Text.Icon}" FontSize="14" />
           </Button>
+
+          <StackPanel Grid.Row="1" Grid.ColumnSpan="4" Margin="0,14,0,0">
+            <TextBlock Text="Micrófono virtual (salida al cable)" Style="{StaticResource Text.Caption}" Margin="0,0,0,6" />
+            <ComboBox ItemsSource="{Binding VirtualDevices}" SelectedItem="{Binding SelectedVirtual}"
+                      AutomationProperties.Name="Salida del micrófono virtual" />
+            <TextBlock Text="{Binding DiscordHint}" Style="{StaticResource Text.Caption}" Margin="0,6,0,0"
+                       Foreground="{StaticResource Brush.AccentHover}" TextWrapping="Wrap" TextTrimming="None"
+                       Visibility="{Binding DiscordHint, Converter={x:Static conv:VisibilityConverters.NotNull}}" />
+          </StackPanel>
         </Grid>
+      </Border>
+
+      <!-- Avisos de enrutado -->
+      <Border Style="{StaticResource Card}" BorderBrush="{StaticResource Brush.Danger}" Background="#3A1C22" Margin="0,16,16,0" Padding="14,10"
+              Visibility="{Binding RoutingError, Converter={x:Static conv:VisibilityConverters.NotNull}}">
+        <TextBlock Text="{Binding RoutingError}" Style="{StaticResource Text.Body}" Foreground="{StaticResource Brush.Danger}" />
+      </Border>
+      <Border Style="{StaticResource Card.Warning}" Margin="0,16,16,0"
+              Visibility="{Binding RoutingWarning, Converter={x:Static conv:VisibilityConverters.NotNull}}">
+        <TextBlock Text="{Binding RoutingWarning}" Style="{StaticResource Text.Body}" Foreground="{StaticResource Brush.Warning}" />
       </Border>
 
       <!-- Aviso de silencio global -->
@@ -222,8 +247,57 @@
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="300" />
           <ColumnDefinition Width="16" />
+          <ColumnDefinition Width="300" />
+          <ColumnDefinition Width="16" />
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="2" Style="{StaticResource Card}">
+          <StackPanel>
+            <DockPanel>
+              <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Toggle.Mute}"
+                            IsChecked="{Binding VirtualMuted}" ToolTip="Silenciar el micrófono virtual"
+                            AutomationProperties.Name="Silenciar micrófono virtual">
+                <TextBlock Text="&#xE74F;" FontFamily="{StaticResource Font.Icons}" FontSize="14"
+                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" />
+              </ToggleButton>
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="&#xE720;" Style="{StaticResource Text.Icon}" />
+                <TextBlock Text="Micrófono virtual" Style="{StaticResource Text.Section}" Margin="10,0,0,0" />
+              </StackPanel>
+            </DockPanel>
+
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+              <Ellipse Width="8" Height="8" VerticalAlignment="Center">
+                <Ellipse.Style>
+                  <Style TargetType="Ellipse">
+                    <Setter Property="Fill" Value="{StaticResource Brush.TextMuted}" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsVirtualActive}" Value="True">
+                        <Setter Property="Fill" Value="{StaticResource Brush.Success}" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Ellipse.Style>
+              </Ellipse>
+              <TextBlock Text="{Binding VirtualStatusText}" Style="{StaticResource Text.Caption}" Margin="6,0,0,0"
+                         MaxWidth="240" ToolTip="{Binding VirtualStatusText}" />
+            </StackPanel>
+
+            <controls:LevelMeter LevelDb="{Binding VirtualLevelDb}" PeakDb="{Binding VirtualPeakDb}" Height="8" Margin="0,14,0,0" />
+
+            <DockPanel Margin="0,14,0,4">
+              <TextBlock DockPanel.Dock="Right" Text="{Binding VirtualGainText}" Style="{StaticResource Text.Caption}" />
+              <TextBlock Text="Volumen" Style="{StaticResource Text.Caption}" />
+            </DockPanel>
+            <Slider Minimum="{Binding MinGainDb}" Maximum="{Binding MaxGainDb}" Value="{Binding VirtualGainDb}"
+                    SmallChange="0.5" LargeChange="3" AutomationProperties.Name="Volumen del micrófono virtual" />
+
+            <TextBlock Style="{StaticResource Text.Caption}" Margin="0,14,0,0" TextWrapping="Wrap" TextTrimming="None">
+              <Run Text="Lo que oyen los demás. Limitador: " /><Run Text="{Binding VirtualLimiterText, Mode=OneWay}" />
+            </TextBlock>
+          </StackPanel>
+        </Border>
 
         <Border Grid.Column="0" Style="{StaticResource Card}">
           <StackPanel>
@@ -254,14 +328,14 @@
           </StackPanel>
         </Border>
 
-        <Border Grid.Column="2" Style="{StaticResource Card}">
+        <Border Grid.Column="4" Style="{StaticResource Card}">
           <StackPanel>
             <TextBlock Text="Diagnóstico del motor" Style="{StaticResource Text.Section}" />
             <TextBlock Style="{StaticResource Text.Body}" Margin="0,4,0,14"
                        Text="Cada canal muestra su buffer, su deriva y sus vaciados. «Pausas» en una aplicación significa que dejó de sonar, no es un error. El limitador evita que la mezcla supere −0,3 dBFS." />
-            <UniformGrid Columns="3">
+            <UniformGrid Columns="1">
               <StackPanel>
-                <TextBlock Text="Limitador (reducción)" Style="{StaticResource StatLabel}" />
+                <TextBlock Text="Limitador del monitoreo" Style="{StaticResource StatLabel}" />
                 <TextBlock Text="{Binding LimiterText}" Style="{StaticResource StatValue}" />
               </StackPanel>
               <StackPanel>

@@ -31,6 +31,9 @@ public sealed partial class MixerViewModel : PageViewModel
     private readonly SynchronizationContext? _uiContext;
     private readonly DispatcherTimer _meterTimer;
     private readonly MeterBallistics _monitorMeter = new();
+    private readonly MeterBallistics _virtualMeter = new();
+    private IReadOnlyList<AudioEndpointInfo> _inputEndpoints = [];
+    private IReadOnlyList<AudioEndpointInfo> _outputEndpoints = [];
     private DateTime _lastMeterTick = DateTime.UtcNow;
     private bool _devicesLoaded;
     private bool _suppressDeviceChange;
@@ -50,6 +53,42 @@ public sealed partial class MixerViewModel : PageViewModel
 
     [ObservableProperty]
     private DeviceOption? _selectedMonitor;
+
+    [ObservableProperty]
+    private DeviceOption? _selectedVirtual;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(VirtualGainText))]
+    private double _virtualGainDb;
+
+    [ObservableProperty]
+    private bool _virtualMuted;
+
+    [ObservableProperty]
+    private double _virtualLevelDb = Decibels.Floor;
+
+    [ObservableProperty]
+    private double _virtualPeakDb = Decibels.Floor;
+
+    [ObservableProperty]
+    private string _virtualLimiterText = "0,0 dB";
+
+    [ObservableProperty]
+    private bool _isVirtualActive;
+
+    [ObservableProperty]
+    private string _virtualStatusText = "Micrófono virtual desactivado.";
+
+    /// <summary>Qué entrada hay que elegir en Discord u otras aplicaciones.</summary>
+    [ObservableProperty]
+    private string? _discordHint;
+
+    /// <summary>Configuración peligrosa (realimentación): el micrófono virtual no se activa mientras exista.</summary>
+    [ObservableProperty]
+    private string? _routingError;
+
+    [ObservableProperty]
+    private string? _routingWarning;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MonitorGainText))]
@@ -85,7 +124,7 @@ public sealed partial class MixerViewModel : PageViewModel
         ISettingsService settings,
         ILogger<MixerViewModel> logger)
         : base("mixer", "Mezclador", "\uE9E9",
-            "Cada fuente es un canal independiente. El envío al micrófono virtual llegará en la Fase 5.")
+            "Cada fuente es un canal con envíos independientes al micrófono virtual (lo que oyen los demás) y al monitoreo (lo que oyes tú).")
     {
         _engine = engine;
         _catalog = catalog;
@@ -95,6 +134,8 @@ public sealed partial class MixerViewModel : PageViewModel
 
         MonitorGainDb = engine.Monitor.GainDb;
         MonitorMuted = engine.Monitor.IsMuted;
+        VirtualGainDb = engine.VirtualMicrophone.GainDb;
+        VirtualMuted = engine.VirtualMicrophone.IsMuted;
         IsGlobalMuted = engine.IsGlobalMuted;
 
         _meterTimer = new DispatcherTimer(DispatcherPriority.Render) { Interval = MeterInterval };
@@ -111,6 +152,10 @@ public sealed partial class MixerViewModel : PageViewModel
     public ObservableCollection<DeviceOption> InputDevices { get; } = [];
 
     public ObservableCollection<DeviceOption> MonitorDevices { get; } = [];
+
+    public ObservableCollection<DeviceOption> VirtualDevices { get; } = [];
+
+    public string VirtualGainText => VirtualGainDb <= -60 ? "−∞ dB" : $"{VirtualGainDb:+0.0;−0.0;0.0} dB";
 
     public bool IsRunning => EngineState != EngineState.Stopped;
 
@@ -172,18 +217,24 @@ public sealed partial class MixerViewModel : PageViewModel
                 _catalog.GetEndpoints(EndpointFlow.Render)));
 
             AudioSettings audio = _settings.Current.Audio;
+            _inputEndpoints = inputs;
+            _outputEndpoints = outputs;
             _suppressDeviceChange = true;
             try
             {
                 Fill(InputDevices, inputs);
                 Fill(MonitorDevices, outputs);
+                FillVirtual(VirtualDevices, outputs);
                 SelectedInput = Find(InputDevices, audio.InputDeviceId);
                 SelectedMonitor = Find(MonitorDevices, audio.MonitorDeviceId);
+                SelectedVirtual = Find(VirtualDevices, audio.VirtualOutputDeviceId);
             }
             finally
             {
                 _suppressDeviceChange = false;
             }
+
+            UpdateRoutingChecks();
 
             _devicesLoaded = true;
         }
@@ -204,12 +255,20 @@ public sealed partial class MixerViewModel : PageViewModel
 
     partial void OnSelectedMonitorChanged(DeviceOption? value) => _ = OnDeviceSelectionChangedAsync();
 
+    partial void OnSelectedVirtualChanged(DeviceOption? value) => _ = OnDeviceSelectionChangedAsync();
+
+    partial void OnVirtualGainDbChanged(double value) => _engine.VirtualMicrophone.GainDb = (float)value;
+
+    partial void OnVirtualMutedChanged(bool value) => _engine.VirtualMicrophone.IsMuted = value;
+
     private async Task OnDeviceSelectionChangedAsync()
     {
-        if (_suppressDeviceChange || SelectedInput is null || SelectedMonitor is null)
+        if (_suppressDeviceChange || SelectedInput is null || SelectedMonitor is null || SelectedVirtual is null)
         {
             return;
         }
+
+        UpdateRoutingChecks();
 
         try
         {
@@ -218,6 +277,7 @@ public sealed partial class MixerViewModel : PageViewModel
             {
                 InputDeviceId = SelectedInput.Id,
                 MonitorDeviceId = SelectedMonitor.Id,
+                VirtualOutputDeviceId = SelectedVirtual.Id,
             };
 
             if (audio != current.Audio)
@@ -245,7 +305,10 @@ public sealed partial class MixerViewModel : PageViewModel
             new AudioFormat(audio.SampleRate, 2),
             audio.BufferMilliseconds,
             audio.InputDeviceId,
-            audio.MonitorDeviceId);
+            audio.MonitorDeviceId,
+
+            // Con una configuración que se realimentaría, el motor arranca sin micrófono virtual.
+            RoutingError is null ? audio.VirtualOutputDeviceId : null);
     }
 
     private void SyncChannels()
@@ -284,13 +347,22 @@ public sealed partial class MixerViewModel : PageViewModel
         DeviceSummary = status.State == EngineState.Running
             ? $"{status.InputDeviceName} → {status.MonitorDeviceName} · buffer de salida {status.OutputLatencyMilliseconds:0} ms"
             : null;
+        IsVirtualActive = status.VirtualDeviceName is not null;
+        VirtualStatusText = status.State == EngineState.Stopped
+            ? (SelectedVirtual?.Id is null ? "Micrófono virtual desactivado." : "Se activará al iniciar el motor.")
+            : status.VirtualDeviceName is not null
+                ? $"Enviando a «{status.VirtualDeviceName}»"
+                : RoutingError ?? status.VirtualMessage ?? "Micrófono virtual desactivado.";
 
         if (status.State == EngineState.Stopped)
         {
             _meterTimer.Stop();
             _monitorMeter.Reset();
+            _virtualMeter.Reset();
             MonitorLevelDb = _monitorMeter.LevelDb;
             MonitorPeakDb = _monitorMeter.PeakDb;
+            VirtualLevelDb = _virtualMeter.LevelDb;
+            VirtualPeakDb = _virtualMeter.PeakDb;
             foreach (ChannelViewModel channel in Channels)
             {
                 channel.ResetMeters();
@@ -321,6 +393,10 @@ public sealed partial class MixerViewModel : PageViewModel
         Resyncs = metrics.Resyncs;
         ClippedSamples = metrics.ClippedSamples;
         LimiterText = metrics.MonitorGainReductionDb > 0.05f ? $"−{metrics.MonitorGainReductionDb:0.0} dB" : "0,0 dB";
+        _virtualMeter.Update(metrics.VirtualOutput.Max, elapsed, now);
+        VirtualLevelDb = _virtualMeter.LevelDb;
+        VirtualPeakDb = _virtualMeter.PeakDb;
+        VirtualLimiterText = metrics.VirtualGainReductionDb > 0.05f ? $"−{metrics.VirtualGainReductionDb:0.0} dB" : "0,0 dB";
     }
 
     private void PostToUi(Action action)
@@ -342,6 +418,63 @@ public sealed partial class MixerViewModel : PageViewModel
         foreach (AudioEndpointInfo endpoint in endpoints)
         {
             target.Add(new DeviceOption(endpoint.Id, endpoint.Name));
+        }
+    }
+
+    /// <summary>
+    /// Avisos de enrutado: realimentación (el micrófono es la salida del propio cable), monitoreo y micrófono virtual en
+    /// el mismo dispositivo, o el cable como salida predeterminada de Windows (todo el audio del PC iría al micrófono).
+    /// </summary>
+    private void UpdateRoutingChecks()
+    {
+        RoutingError = null;
+        RoutingWarning = null;
+        DiscordHint = null;
+
+        AudioEndpointInfo? virtualEndpoint = _outputEndpoints.FirstOrDefault(o => o.Id == SelectedVirtual?.Id);
+        if (virtualEndpoint is null)
+        {
+            return;
+        }
+
+        AudioEndpointInfo? captureSide = VirtualCablePairing.FindCaptureSide(virtualEndpoint, _inputEndpoints);
+        DiscordHint = captureSide is not null
+            ? $"En Discord (o la aplicación que uses), elige como micrófono «{captureSide.Name}»."
+            : "En Discord, elige como micrófono la entrada que corresponde a este dispositivo.";
+
+        string? micId = SelectedInput?.Id ?? _inputEndpoints.FirstOrDefault(i => i.IsDefault)?.Id;
+        if (captureSide is not null && micId == captureSide.Id)
+        {
+            RoutingError = $"Tu micrófono es «{captureSide.Name}», la salida del propio micrófono virtual: se realimentaría. " +
+                "Elige tu micrófono real. Mientras tanto, el micrófono virtual queda desactivado.";
+        }
+
+        AudioEndpointInfo? defaultOutput = _outputEndpoints.FirstOrDefault(o => o.IsDefault);
+        string? monitorId = SelectedMonitor?.Id ?? defaultOutput?.Id;
+        if (monitorId == virtualEndpoint.Id)
+        {
+            RoutingError ??= "El monitoreo y el micrófono virtual no pueden ser el mismo dispositivo: los demás oirían tu monitoreo. " +
+                "Elige tus auriculares para el monitoreo.";
+        }
+
+        if (defaultOutput?.Id == virtualEndpoint.Id)
+        {
+            RoutingWarning = $"Windows tiene «{virtualEndpoint.Name}» como salida predeterminada: el audio de todas tus aplicaciones " +
+                "acabaría en el micrófono virtual. Cambia la salida predeterminada a tus auriculares en la configuración de sonido.";
+        }
+        else if (!virtualEndpoint.IsLikelyVirtual)
+        {
+            RoutingWarning = $"«{virtualEndpoint.Name}» no parece un cable virtual: la mezcla sonará por ese dispositivo en vez de llegar a un micrófono.";
+        }
+    }
+
+    private static void FillVirtual(ObservableCollection<DeviceOption> target, IEnumerable<AudioEndpointInfo> outputs)
+    {
+        target.Clear();
+        target.Add(new DeviceOption(null, "Desactivado"));
+        foreach (AudioEndpointInfo endpoint in outputs.OrderByDescending(o => o.IsLikelyVirtual))
+        {
+            target.Add(new DeviceOption(endpoint.Id, endpoint.IsLikelyVirtual ? endpoint.Name : $"{endpoint.Name} (no es un cable)"));
         }
     }
 

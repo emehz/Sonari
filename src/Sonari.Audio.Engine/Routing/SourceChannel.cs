@@ -4,7 +4,7 @@ namespace Sonari.Audio.Engine.Routing;
 
 /// <summary>
 /// Una fuente tal y como la ve el resto de la aplicación: identidad, controles y estado. Vive mientras el usuario no la
-/// quite; el <see cref="MixerChannel"/> (buffers y medidores) solo existe mientras el motor está en marcha.
+/// quite; el <see cref="SourceFeed"/> (buffers y medidores) solo existe mientras el motor está en marcha.
 /// </summary>
 internal sealed class SourceChannel : ISourceChannel
 {
@@ -13,7 +13,7 @@ internal sealed class SourceChannel : ISourceChannel
     private SourceStatus _status = SourceStatus.Stopped;
     private string _statusMessage = "Motor detenido";
     private int? _processId;
-    private ChannelStrip? _mixer;
+    private SourceFeed? _feed;
 
     public SourceChannel(SourceKind kind, string displayName, ApplicationTarget? target, Action onChanged)
     {
@@ -68,10 +68,11 @@ internal sealed class SourceChannel : ISourceChannel
         }
     }
 
-    public ChannelStrip? Mixer
+    /// <summary>Buffers y medidores de esta fuente; solo existe con el motor en marcha.</summary>
+    public SourceFeed? Feed
     {
-        get => Volatile.Read(ref _mixer);
-        set => Volatile.Write(ref _mixer, value);
+        get => Volatile.Read(ref _feed);
+        set => Volatile.Write(ref _feed, value);
     }
 
     public float Balance
@@ -98,7 +99,13 @@ internal sealed class SourceChannel : ISourceChannel
         set => Control.SendToMonitor = value;
     }
 
-    public ChannelMetrics ReadMetrics() => Mixer?.ReadMetrics() ?? default;
+    public bool SendToVirtual
+    {
+        get => Control.SendToVirtual;
+        set => Control.SendToVirtual = value;
+    }
+
+    public ChannelMetrics ReadMetrics() => Feed?.ReadMetrics() ?? default;
 
     public void SetStatus(SourceStatus status, string message, int? processId = null)
     {

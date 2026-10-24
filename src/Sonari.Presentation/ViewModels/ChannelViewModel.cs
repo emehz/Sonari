@@ -23,6 +23,9 @@ public sealed partial class ChannelViewModel : ObservableObject
     private bool _sendToMonitor;
 
     [ObservableProperty]
+    private bool _sendToVirtual;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(BalanceText))]
     private double _balance;
 
@@ -47,6 +50,7 @@ public sealed partial class ChannelViewModel : ObservableObject
         _gainDb = source.GainDb;
         _isMuted = source.IsMuted;
         _sendToMonitor = source.SendToMonitor;
+        _sendToVirtual = source.SendToVirtual;
         _balance = source.Balance;
         Icon = ShellIcons.ForExecutable(source.ExecutablePath);
         RefreshStatus();
@@ -139,6 +143,8 @@ public sealed partial class ChannelViewModel : ObservableObject
     partial void OnIsMutedChanged(bool value) => _source.IsMuted = value;
 
     partial void OnSendToMonitorChanged(bool value) => _source.SendToMonitor = value;
+
+    partial void OnSendToVirtualChanged(bool value) => _source.SendToVirtual = value;
 
     partial void OnBalanceChanged(double value) => _source.Balance = (float)value;
 }

@@ -37,6 +37,7 @@ packages/
 # Driver (WDK)
 driver/**/x64/
 driver/**/ARM64/
+driver/out/
 *.cer
 *.pfx
 
