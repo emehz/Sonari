@@ -1,10 +1,12 @@
 using System.Runtime;
 using Microsoft.Extensions.Logging;
 using Sonari.Audio.Core.Devices;
+using Sonari.Audio.Core.Effects;
 using Sonari.Audio.Core.Endpoints;
 using Sonari.Audio.Core.Engine;
 using Sonari.Audio.Core.Formats;
 using Sonari.Audio.Core.Playback;
+using Sonari.Audio.Effects;
 using Sonari.Audio.Engine.Playback;
 using Sonari.Audio.Engine.Routing;
 
@@ -40,6 +42,7 @@ public sealed class AudioEngine : IAudioEngine
     private readonly SoundPlayer _soundPlayer = new();
     private readonly BusControl _monitor = new();
     private readonly BusControl _virtual = new();
+    private readonly VoiceEffectsControl _voiceEffects = new();
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private readonly SemaphoreSlim _wake = new(0, int.MaxValue);
 
@@ -131,6 +134,12 @@ public sealed class AudioEngine : IAudioEngine
     public IBusControl Monitor => _monitor;
 
     public IBusControl VirtualMicrophone => _virtual;
+
+    public VoiceEffectSettings VoiceEffects
+    {
+        get => _voiceEffects.Settings;
+        set => _voiceEffects.Settings = value;
+    }
 
     public bool SupportsProcessCapture => _processCaptureFactory.IsSupported;
 
@@ -334,7 +343,12 @@ public sealed class AudioEngine : IAudioEngine
             _targetFrames,
             source.Kind,
             withVirtualBus: _virtualBus is not null,
-            generator: source.Kind == SourceKind.SoundPlayer ? _soundPlayer.Render : null);
+            generator: source.Kind == SourceKind.SoundPlayer ? _soundPlayer.Render : null,
+            voice: source.Kind == SourceKind.Microphone
+                ? new VoiceProcessor(
+                    new VoiceEffectChain(_options.Format.SampleRate, _options.Format.Channels, SourceFeed.MaxBlockFrames),
+                    _voiceEffects)
+                : null);
 
         feed.PrimaryBus = _virtualRender is not null ? BusKind.Virtual : BusKind.Monitor;
         return feed;

@@ -1,6 +1,6 @@
 using Sonari.Audio.Core.Formats;
 
-namespace Sonari.Audio.Engine.Dsp;
+namespace Sonari.Audio.Effects;
 
 /// <summary>
 /// Limitador de picos con anticipación (lookahead), enlazado entre canales. Garantiza que ninguna muestra supera el
@@ -21,7 +21,7 @@ public sealed class PeakLimiter
 {
     private readonly int _channels;
     private readonly int _length;
-    private readonly float _ceiling;
+    private float _ceiling;
     private readonly float _releaseCoefficient;
     private readonly float[] _delay;
     private readonly float[] _required;
@@ -49,6 +49,9 @@ public sealed class PeakLimiter
     public int LatencyFrames => _length - 1;
 
     public float Ceiling => _ceiling;
+
+    /// <summary>Cambia el techo. Solo desde el hilo que llama a <see cref="Process"/>.</summary>
+    public void SetCeilingDb(float ceilingDb) => _ceiling = Decibels.ToLinear(ceilingDb);
 
     public void Reset()
     {

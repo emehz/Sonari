@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Sonari.Audio.Core.Effects;
 using Sonari.Infrastructure.Settings;
 using Sonari.Infrastructure.Storage;
 
@@ -118,6 +119,28 @@ public sealed class SettingsPersistenceTests : IDisposable
 
         Assert.Equal(sources[..2], reloaded);
         Assert.DoesNotContain("isValid", File.ReadAllText(_paths.SettingsFile), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task VoiceEffects_SurviveARestart()
+    {
+        SettingsService first = CreateService();
+        VoiceEffectSettings robot = VoicePresets.All.Single(p => p.Id == "robot").Settings with
+        {
+            Order = [VoiceEffectKind.Limiter, VoiceEffectKind.Modulation],
+        };
+
+        await first.SaveAsync(first.Current with { Voice = robot }, TestContext.Current.CancellationToken);
+        VoiceEffectSettings reloaded = CreateService().Current.Voice;
+
+        VoiceEffectSettings expected = robot.Normalize();
+        Assert.Equal(expected with { Order = reloaded.Order }, reloaded);
+        Assert.Equal(expected.Order, reloaded.Order);
+
+        // Los enumerados se guardan con su nombre: el JSON se puede leer y editar a mano.
+        string json = File.ReadAllText(_paths.SettingsFile);
+        Assert.Contains("Robot", json);
+        Assert.Contains("Limiter", json);
     }
 
     [Fact]

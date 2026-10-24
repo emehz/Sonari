@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Efectos de voz (Fase 6) y DSP compartido. Código propio en C#, sin dependencias externas ni APIs de Windows:
+    se prueba offline con señales sintéticas.
+  -->
+  <PropertyGroup>
+    <TargetFramework>$(SonariNet)</TargetFramework>
+    <RootNamespace>Sonari.Audio.Effects</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sonari.Audio.Core\Sonari.Audio.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sonari.UnitTests" />
+  </ItemGroup>
+
+</Project>

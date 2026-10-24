@@ -126,5 +126,5 @@ Los mensajes de depuración solo existen en la compilación Debug, que es la que
 | D2 | Nombres propios: «Sonari Virtual Microphone» y «Sonari Virtual Output», con identificadores de hardware de Sonari ✅ (verificado en Windows 10 22H2 el 23/10/2026) |
 | D3 | Conectar la salida con el micrófono (buffer circular en el kernel): lo que Sonari reproduce, lo graba quien abra el micrófono ✅ (verificado en Windows 10 22H2 el 24/10/2026: más de 11 min con pausas, sin cortes ni pantallas azules) |
 | D4 | Estabilidad: Driver Verifier, retirada en caliente, controles de volumen ✅ (verificado en Windows 10 22H2 el 24/10/2026, con Driver Verifier: desinstalar con música sonando, reinstalar sin reiniciar y volumen y silencio de los dos dispositivos). Pendiente: medir el retardo con DebugView para bajar de 30 ms |
-| **D5** | **Sonari detecta su propio driver y lo prefiere a VB-CABLE** |
+| D5 | Sonari detecta su propio driver y lo prefiere a VB-CABLE ✅ (verificado el 24/10/2026: se elige solo, la grabación de «Sonari Virtual Microphone» suena limpia y sus dispositivos nunca se usan como micrófono, monitoreo ni predeterminado de Sonari) |
 | D6 | Instalador y firma para distribuirlo (certificado EV y firma de Microsoft) |

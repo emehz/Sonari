@@ -19,19 +19,9 @@ public sealed class PlannedPageViewModel(
 
     public IReadOnlyList<string> PlannedFeatures { get; } = plannedFeatures;
 
-    /// <summary>Páginas pendientes, en el orden en que aparecen en la navegación (después de Mezclador, Fuentes y Sonidos).</summary>
+    /// <summary>Páginas pendientes, en el orden en que aparecen en la navegación (después de Mezclador, Fuentes, Sonidos y Voz).</summary>
     public static IEnumerable<PlannedPageViewModel> CreateDefaults()
     {
-        yield return new("voice", "Voz", "\uE720",
-            "Cadena de efectos en tiempo real para el micrófono.",
-            6,
-            [
-                "Puerta de ruido, pasaaltos, ecualizador, compresor y limitador",
-                "Cambio de tono, eco, reverberación, distorsión y modulación",
-                "Orden configurable y bypass sin clics",
-                "Arquitectura preparada para módulos de IA opcionales",
-            ]);
-
         yield return new("scenes", "Escenas", "\uE8A9",
             "Configuraciones completas que se activan con un clic o un atajo.",
             7,

@@ -2,7 +2,7 @@
 
 Mezclador de audio en tiempo real para Windows: micrófono, aplicaciones concretas, audio del sistema y sonidos, todo enviado a un micrófono virtual y con monitoreo independiente por auriculares.
 
-> **Estado: Fase 5 (micrófono virtual).** Micrófono, aplicaciones, audio del sistema y panel de sonidos mezclados en dos salidas independientes: el **micrófono virtual** (lo que oyen los demás, a través de un cable virtual como VB-CABLE) y el **monitoreo** (lo que oyes tú). Todavía no hay efectos de voz (Fase 6) ni escenas y atajos (Fase 7). Cómo instalar el cable y configurar Discord: [docs/05-fase-5-microfono-virtual.md](docs/05-fase-5-microfono-virtual.md).
+> **Estado: Fase 6 (efectos de voz).** Micrófono, aplicaciones, audio del sistema y panel de sonidos mezclados en dos salidas independientes: el **micrófono virtual** (lo que oyen los demás, a través de un cable virtual como VB-CABLE) y el **monitoreo** (lo que oyes tú). El micrófono pasa por una cadena de 10 efectos en tiempo real con voces predefinidas ([docs/06-fase-6-efectos-de-voz.md](docs/06-fase-6-efectos-de-voz.md)). Todavía no hay escenas ni atajos (Fase 7). Cómo instalar el cable y configurar Discord: [docs/05-fase-5-microfono-virtual.md](docs/05-fase-5-microfono-virtual.md).
 
 ## Requisitos
 
@@ -41,6 +41,7 @@ src/
   Sonari.Presentation   Vistas XAML, ViewModels (MVVM) y tema oscuro
   Sonari.Audio.Core     Contratos, formatos, buffers lock-free (sin dependencias)
   Sonari.Audio.Engine   Grafo de mezcla, compensación de deriva, supervisor (sin NAudio)
+  Sonari.Audio.Effects  Efectos de voz y limitador: DSP propio, sin dependencias
   Sonari.Audio.Capture  Captura WASAPI: micrófono, aplicaciones y sistema
   Sonari.Audio.Output   Salida WASAPI (monitoreo)
   Sonari.Audio.Playback Decodificación de archivos de audio (Media Foundation)
@@ -55,6 +56,7 @@ docs/
   03-fase-3-captura-por-aplicacion.md  Captura por aplicación y audio del sistema
   04-fase-4-mezclador-y-sonidos.md     Limitador, balance, silencio global y panel de sonidos
   05-fase-5-microfono-virtual.md       Micrófono virtual, VB-CABLE y Discord
+  06-fase-6-efectos-de-voz.md          Cadena de efectos de voz y voces predefinidas
 ```
 
 `dotnet test` usa Microsoft.Testing.Platform (configurado en `global.json`), como exige xUnit v3 con el SDK de .NET 10. El Explorador de pruebas de Visual Studio funciona sin cambios.

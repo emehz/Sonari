@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Sonari.Audio.Core.Effects;
 using Sonari.Audio.Core.Endpoints;
 using Sonari.Audio.Core.Engine;
 using Sonari.Audio.Core.Formats;
@@ -202,6 +203,40 @@ public sealed class VirtualMicrophoneTests : IAsyncDisposable
 
         Assert.Single(_devices.Renders);
         Assert.Equal("Micrófono virtual desactivado.", _engine.Status.VirtualMessage);
+    }
+
+    [Fact]
+    public async Task VoiceEffects_ProcessTheMicrophoneOnceForBothMixes()
+    {
+        _engine.VoiceEffects = new VoiceEffectSettings { Limiter = new() { Enabled = true, CeilingDb = -12 } };
+        _engine.Microphone.SendToMonitor = true;
+        await _engine.StartAsync(Options, TestContext.Current.CancellationToken);
+
+        (float monitor, float virtualMic) = Run(40, micLevel: 0.9f);
+
+        float ceiling = Decibels.ToLinear(-12);
+        Assert.Equal(ceiling, monitor, 1e-3f);
+        Assert.Equal(ceiling, virtualMic, 1e-3f);
+    }
+
+    [Fact]
+    public async Task VoiceEffects_ChangeWhileRunning()
+    {
+        await _engine.StartAsync(Options, TestContext.Current.CancellationToken);
+        Assert.Equal(0.3f, Run(20, micLevel: 0.3f).Virtual, 1e-4f);
+
+        _engine.VoiceEffects = new VoiceEffectSettings { Limiter = new() { Enabled = true, CeilingDb = -20 } };
+
+        Assert.Equal(0.1f, Run(40, micLevel: 0.3f).Virtual, 1e-3f);
+    }
+
+    [Fact]
+    public async Task VoiceEffects_MasterSwitchOff_LeavesTheVoiceUntouched()
+    {
+        _engine.VoiceEffects = new VoiceEffectSettings { Enabled = false, Limiter = new() { Enabled = true, CeilingDb = -20 } };
+        await _engine.StartAsync(Options, TestContext.Current.CancellationToken);
+
+        Assert.Equal(0.3f, Run(20, micLevel: 0.3f).Virtual, 1e-4f);
     }
 
     /// <summary>Fábrica que nombra cada salida por su id, para distinguir auriculares y cable.</summary>

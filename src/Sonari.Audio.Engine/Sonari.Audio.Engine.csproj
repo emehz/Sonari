@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Sonari.Audio.Core\Sonari.Audio.Core.csproj" />
+    <ProjectReference Include="..\Sonari.Audio.Effects\Sonari.Audio.Effects.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -14,6 +14,8 @@ namespace Sonari.Audio.Engine.Routing;
 /// (la del micrófono virtual si está activa, si no la de monitoreo) dentro de su bloque, que reenvía una copia a la otra.
 /// Así, si los auriculares fallan, los demás siguen oyendo los sonidos.</item>
 /// </list>
+/// El micrófono pasa además por la cadena de voz (<see cref="VoiceProcessor"/>) antes de repartirse: se procesa una
+/// sola vez y las dos mezclas reciben la misma voz.
 /// Se crea en cada arranque del motor (los buffers dependen del formato).
 /// </summary>
 internal sealed class SourceFeed
@@ -23,6 +25,8 @@ internal sealed class SourceFeed
 
     private readonly BusInput[] _inputs;
     private readonly RenderHandler? _generator;
+    private readonly VoiceProcessor? _voice;
+    private readonly float[]? _voiceBuffer;
     private readonly int _channels;
     private int _primaryBus;
     private int _generating;
@@ -31,10 +35,13 @@ internal sealed class SourceFeed
     private long _lastPacketTicks;
     private long _skippedGenerations;
 
-    public SourceFeed(ChannelControl control, AudioFormat format, int targetFrames, SourceKind kind, bool withVirtualBus, RenderHandler? generator)
+    public SourceFeed(ChannelControl control, AudioFormat format, int targetFrames, SourceKind kind, bool withVirtualBus,
+        RenderHandler? generator, VoiceProcessor? voice = null)
     {
         _channels = format.Channels;
         _generator = generator;
+        _voice = voice;
+        _voiceBuffer = voice is null ? null : new float[MaxBlockFrames * format.Channels];
         bool intermittent = kind is SourceKind.Application or SourceKind.SystemAudio;
 
         BusInput Create(BusKind bus) => new(this, control, bus, format, targetFrames, intermittent);
@@ -70,8 +77,24 @@ internal sealed class SourceFeed
             Interlocked.Increment(ref _discontinuities);
         }
 
+        // El medidor de entrada mide la voz antes de los efectos: es lo que hace falta para ajustar la puerta de ruido.
         InputMeter.Process(interleaved, _channels);
-        WriteToInputs(interleaved, except: null);
+        if (_voice is null)
+        {
+            WriteToInputs(interleaved, except: null);
+            return;
+        }
+
+        // El paquete de captura es de solo lectura: se procesa una copia, por trozos del tamaño del buffer reservado.
+        float[] buffer = _voiceBuffer!;
+        int whole = interleaved.Length - (interleaved.Length % _channels);
+        for (int offset = 0; offset < whole; offset += buffer.Length)
+        {
+            Span<float> block = buffer.AsSpan(0, Math.Min(buffer.Length, whole - offset));
+            interleaved.Slice(offset, block.Length).CopyTo(block);
+            _voice.Process(block);
+            WriteToInputs(block, except: null);
+        }
     }
 
     /// <summary>

@@ -71,6 +71,8 @@ internal static class CompositionRoot
         services.AddSingleton<PageViewModel>(sp => sp.GetRequiredService<SourcesViewModel>());
         services.AddSingleton<SoundboardViewModel>();
         services.AddSingleton<PageViewModel>(sp => sp.GetRequiredService<SoundboardViewModel>());
+        services.AddSingleton<VoiceViewModel>();
+        services.AddSingleton<PageViewModel>(sp => sp.GetRequiredService<VoiceViewModel>());
         foreach (PlannedPageViewModel page in PlannedPageViewModel.CreateDefaults())
         {
             services.AddSingleton<PageViewModel>(page);

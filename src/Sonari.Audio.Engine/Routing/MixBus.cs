@@ -1,4 +1,5 @@
 using Sonari.Audio.Core.Formats;
+using Sonari.Audio.Effects;
 using Sonari.Audio.Engine.Dsp;
 
 namespace Sonari.Audio.Engine.Routing;

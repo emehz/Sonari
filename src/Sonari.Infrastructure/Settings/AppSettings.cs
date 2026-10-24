@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Sonari.Audio.Core.Effects;
 
 namespace Sonari.Infrastructure.Settings;
 
@@ -16,12 +17,16 @@ public sealed record AppSettings
 
     public UiSettings Ui { get; init; } = new();
 
+    /// <summary>Efectos de voz del micrófono, tal como se dejaron la última vez.</summary>
+    public VoiceEffectSettings Voice { get; init; } = new();
+
     /// <summary>Corrige valores fuera de rango (p. ej. tras editar el JSON a mano) en vez de fallar al arrancar.</summary>
     public AppSettings Normalize() => this with
     {
         SchemaVersion = CurrentSchemaVersion,
         Audio = (Audio ?? new AudioSettings()).Normalize(),
         Ui = Ui ?? new UiSettings(),
+        Voice = (Voice ?? new VoiceEffectSettings()).Normalize(),
     };
 }
 

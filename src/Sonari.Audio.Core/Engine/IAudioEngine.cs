@@ -1,3 +1,4 @@
+using Sonari.Audio.Core.Effects;
 using Sonari.Audio.Core.Formats;
 using Sonari.Audio.Core.Playback;
 
@@ -126,6 +127,12 @@ public interface IAudioEngine : IAsyncDisposable
 
     /// <summary>Volumen y silencio de la mezcla que se envía al micrófono virtual, independientes del monitoreo.</summary>
     IBusControl VirtualMicrophone { get; }
+
+    /// <summary>
+    /// Cadena de efectos del micrófono. Se aplica en el siguiente bloque de audio, también con el motor en marcha, y se
+    /// conserva entre arranques. Al asignarla se normaliza (valores fuera de rango, orden incompleto).
+    /// </summary>
+    VoiceEffectSettings VoiceEffects { get; set; }
 
     /// <summary>Si es falso, no se pueden añadir fuentes de aplicación ni de sistema.</summary>
     bool SupportsProcessCapture { get; }
