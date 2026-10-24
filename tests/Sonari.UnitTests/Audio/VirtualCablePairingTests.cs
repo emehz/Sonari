@@ -30,6 +30,20 @@ public class VirtualCablePairingTests
     }
 
     [Fact]
+    public void FindsTheMicrophoneOfTheSonariDriver()
+    {
+        // Con el driver propio, los avisos de realimentación y la indicación para Discord salen de este emparejamiento.
+        var render = Endpoint("r1", "Sonari Virtual Output (Sonari Virtual Audio)", EndpointFlow.Render, true);
+        AudioEndpointInfo[] captures =
+        [
+            Endpoint("c1", "CABLE Output (VB-Audio Virtual Cable)", EndpointFlow.Capture, true),
+            Endpoint("c2", "Sonari Virtual Microphone (Sonari Virtual Audio)", EndpointFlow.Capture, true),
+        ];
+
+        Assert.Equal("c2", VirtualCablePairing.FindCaptureSide(render, captures)?.Id);
+    }
+
+    [Fact]
     public void PhysicalHeadset_IsNotTreatedAsACable()
     {
         // Un auricular real también tiene salida y micro con el mismo nombre de dispositivo, pero no es un cable.

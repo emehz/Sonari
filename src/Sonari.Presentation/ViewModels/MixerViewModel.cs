@@ -17,8 +17,8 @@ public sealed record DeviceOption(string? Id, string Name)
 }
 
 /// <summary>
-/// Mezclador: una tira por fuente (micrófono, aplicaciones, sistema) y el bus de monitoreo, con medidores y
-/// diagnóstico. Los envíos al micrófono virtual llegarán en la Fase 5.
+/// Mezclador: una tira por fuente (micrófono, aplicaciones, sistema) con envíos al micrófono virtual y al monitoreo,
+/// los dispositivos de cada mezcla, medidores y diagnóstico.
 /// </summary>
 public sealed partial class MixerViewModel : PageViewModel
 {
@@ -37,6 +37,8 @@ public sealed partial class MixerViewModel : PageViewModel
     private DateTime _lastMeterTick = DateTime.UtcNow;
     private bool _devicesLoaded;
     private bool _suppressDeviceChange;
+    private bool _autoSelectingVirtual;
+    private bool _virtualChosenByUser;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsRunning), nameof(IsStopped), nameof(EngineButtonText))]
@@ -234,6 +236,24 @@ public sealed partial class MixerViewModel : PageViewModel
                 _suppressDeviceChange = false;
             }
 
+            // Con el driver de Sonari instalado, el micrófono virtual lo usa sin que haya que elegirlo, salvo que el
+            // usuario ya haya elegido otra cosa. Esto lo guarda en los ajustes como cualquier otro cambio.
+            AudioEndpointInfo? sonariOutput = SonariVirtualDevice.AutoSelectOutput(
+                outputs, audio.VirtualOutputDeviceId, audio.VirtualOutputChosen);
+            if (sonariOutput is not null)
+            {
+                _logger.LogInformation("Micrófono virtual: se elige el driver de Sonari ({Name})", sonariOutput.Name);
+                _autoSelectingVirtual = true;
+                try
+                {
+                    SelectedVirtual = Find(VirtualDevices, sonariOutput.Id);
+                }
+                finally
+                {
+                    _autoSelectingVirtual = false;
+                }
+            }
+
             UpdateRoutingChecks();
 
             _devicesLoaded = true;
@@ -255,7 +275,15 @@ public sealed partial class MixerViewModel : PageViewModel
 
     partial void OnSelectedMonitorChanged(DeviceOption? value) => _ = OnDeviceSelectionChangedAsync();
 
-    partial void OnSelectedVirtualChanged(DeviceOption? value) => _ = OnDeviceSelectionChangedAsync();
+    partial void OnSelectedVirtualChanged(DeviceOption? value)
+    {
+        if (!_suppressDeviceChange && !_autoSelectingVirtual)
+        {
+            _virtualChosenByUser = true;
+        }
+
+        _ = OnDeviceSelectionChangedAsync();
+    }
 
     partial void OnVirtualGainDbChanged(double value) => _engine.VirtualMicrophone.GainDb = (float)value;
 
@@ -278,6 +306,7 @@ public sealed partial class MixerViewModel : PageViewModel
                 InputDeviceId = SelectedInput.Id,
                 MonitorDeviceId = SelectedMonitor.Id,
                 VirtualOutputDeviceId = SelectedVirtual.Id,
+                VirtualOutputChosen = current.Audio.VirtualOutputChosen || _virtualChosenByUser,
             };
 
             if (audio != current.Audio)
@@ -411,11 +440,22 @@ public sealed partial class MixerViewModel : PageViewModel
         }
     }
 
-    private static void Fill(ObservableCollection<DeviceOption> target, IEnumerable<AudioEndpointInfo> endpoints)
+    /// <summary>
+    /// Micrófono o monitoreo. Los dispositivos del driver de Sonari no se ofrecen: Sonari se grabaría o se oiría a sí
+    /// mismo en bucle. Si Windows tiene uno de ellos como predeterminado, la opción dice qué dispositivo se usa en su lugar.
+    /// </summary>
+    private static void Fill(ObservableCollection<DeviceOption> target, IReadOnlyList<AudioEndpointInfo> endpoints)
     {
         target.Clear();
-        target.Add(new DeviceOption(null, "Predeterminado de Windows"));
-        foreach (AudioEndpointInfo endpoint in endpoints)
+        AudioEndpointInfo? windowsDefault = endpoints.FirstOrDefault(e => e.IsDefault);
+        AudioEndpointInfo? effective = SonariVirtualDevice.EffectiveDefault(endpoints);
+        string defaultLabel = windowsDefault is null || !SonariVirtualDevice.IsSonari(windowsDefault)
+            ? "Predeterminado de Windows"
+            : effective is not null
+                ? $"Predeterminado de Windows (es de Sonari, se usa «{effective.Name}»)"
+                : "Predeterminado de Windows (es de Sonari y no hay otro dispositivo)";
+        target.Add(new DeviceOption(null, defaultLabel));
+        foreach (AudioEndpointInfo endpoint in endpoints.Where(e => !SonariVirtualDevice.IsSonari(e)))
         {
             target.Add(new DeviceOption(endpoint.Id, endpoint.Name));
         }
@@ -442,7 +482,7 @@ public sealed partial class MixerViewModel : PageViewModel
             ? $"En Discord (o la aplicación que uses), elige como micrófono «{captureSide.Name}»."
             : "En Discord, elige como micrófono la entrada que corresponde a este dispositivo.";
 
-        string? micId = SelectedInput?.Id ?? _inputEndpoints.FirstOrDefault(i => i.IsDefault)?.Id;
+        string? micId = SelectedInput?.Id ?? SonariVirtualDevice.EffectiveDefault(_inputEndpoints)?.Id;
         if (captureSide is not null && micId == captureSide.Id)
         {
             RoutingError = $"Tu micrófono es «{captureSide.Name}», la salida del propio micrófono virtual: se realimentaría. " +
@@ -450,7 +490,7 @@ public sealed partial class MixerViewModel : PageViewModel
         }
 
         AudioEndpointInfo? defaultOutput = _outputEndpoints.FirstOrDefault(o => o.IsDefault);
-        string? monitorId = SelectedMonitor?.Id ?? defaultOutput?.Id;
+        string? monitorId = SelectedMonitor?.Id ?? SonariVirtualDevice.EffectiveDefault(_outputEndpoints)?.Id;
         if (monitorId == virtualEndpoint.Id)
         {
             RoutingError ??= "El monitoreo y el micrófono virtual no pueden ser el mismo dispositivo: los demás oirían tu monitoreo. " +
@@ -468,13 +508,19 @@ public sealed partial class MixerViewModel : PageViewModel
         }
     }
 
+    /// <summary>Primero el driver de Sonari, luego otros cables virtuales y al final el resto de salidas.</summary>
     private static void FillVirtual(ObservableCollection<DeviceOption> target, IEnumerable<AudioEndpointInfo> outputs)
     {
         target.Clear();
         target.Add(new DeviceOption(null, "Desactivado"));
-        foreach (AudioEndpointInfo endpoint in outputs.OrderByDescending(o => o.IsLikelyVirtual))
+        foreach (AudioEndpointInfo endpoint in outputs
+            .OrderByDescending(SonariVirtualDevice.IsSonari)
+            .ThenByDescending(o => o.IsLikelyVirtual))
         {
-            target.Add(new DeviceOption(endpoint.Id, endpoint.IsLikelyVirtual ? endpoint.Name : $"{endpoint.Name} (no es un cable)"));
+            string label = SonariVirtualDevice.IsSonari(endpoint) ? $"{endpoint.Name} · driver de Sonari"
+                : endpoint.IsLikelyVirtual ? endpoint.Name
+                : $"{endpoint.Name} (no es un cable)";
+            target.Add(new DeviceOption(endpoint.Id, label));
         }
     }
 

@@ -76,7 +76,9 @@ Cada amigo tiene que instalarlo en su propio PC. Sonari no puede incluirlo en su
 
 ## Limitaciones conocidas
 
-* **Dependencia de VB-CABLE u otro cable:** el micrófono propio «Sonari Virtual Microphone» requiere un driver en C++ y firmarlo con un certificado EV (documento 01, sección C). Está planificado como subproyecto aparte.
+* **Dependencia de VB-CABLE u otro cable:** el micrófono propio «Sonari Virtual Microphone» requiere un driver en C++ y firmarlo con un certificado EV (documento 01, sección C). El driver ya funciona en pruebas (`driver/`, ver su README), pero todavía no se distribuye.
+  * Si está instalado, Sonari lo reconoce por el nombre del dispositivo, «Sonari Virtual Audio». Lo pone el primero de la lista y lo elige solo para el micrófono virtual si el usuario no eligió otra cosa, o si lo que eligió ya no existe.
+  * Las protecciones contra la realimentación y la indicación para Discord funcionan igual que con VB-CABLE.
 * **Nombre del micrófono:** con VB-CABLE, el micrófono se llama «CABLE Output». Puedes renombrarlo en Windows (Panel de control de sonido → Grabación → Propiedades), pero ese nombre lo controla el driver.
 * **Latencia:** el cable añade su propio buffer, configurable en el panel de VB-CABLE, y Discord el suyo. La latencia total se medirá en la Fase 8.
 * **Cambiar el micrófono o el monitoreo** sigue reabriendo todo el motor (corte breve). Cambiar o perder **solo** el cable no corta nada más.

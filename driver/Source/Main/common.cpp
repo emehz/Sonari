@@ -634,8 +634,11 @@ Return Value:
     }
     IF_FAILED_JUMP(ntStatus, Done);
 
-    ntStatus = m_pLoopback->Init();
+    ntStatus = m_pLoopback->Init(g_LoopbackDelayMs);
     IF_FAILED_JUMP(ntStatus, Done);
+
+    DPF(D_TERSE, ("Loopback capture delay: %u ms",
+        m_pLoopback->CaptureDelayFrames() * 1000 / CLoopbackBuffer::SampleRate));
 
     //
     // Initialize SaveData class.

@@ -33,6 +33,25 @@ Return Value:
 --*/
 {
     PAGED_CODE();
+
+    // Stop the timer first (Sonari): its callback uses the miniport, the adapter's
+    // loopback and the buffers freed below.
+    if (m_pNotificationTimer)
+    {
+        ExDeleteTimer
+        (
+            m_pNotificationTimer, 
+            TRUE, // Cancel the timer if it is currently set.
+            TRUE, // Wait for the timer to finish expiring and for any callback to a ExTimerCallback routine to finish.
+            NULL
+         );
+    }
+
+    // Since we just cancelled the notification timer, wait for all queued 
+    // DPCs to complete before we free the notification DPC.
+    //
+    KeFlushQueuedDpcs();
+
     if (NULL != m_pMiniport)
     {
     
@@ -81,22 +100,6 @@ Return Value:
         ExFreePoolWithTag( m_pWfExt, MINWAVERTSTREAM_POOLTAG );
         m_pWfExt = NULL;
     }
-    if (m_pNotificationTimer)
-    {
-        ExDeleteTimer
-        (
-            m_pNotificationTimer, 
-            TRUE, // Cancel the timer if it is currently set.
-            TRUE, // Wait for the timer to finish expiring and for any callback to a ExTimerCallback routine to finish.
-            NULL
-         );
-    }
-
-    // Since we just cancelled the notification timer, wait for all queued 
-    // DPCs to complete before we free the notification DPC.
-    //
-    KeFlushQueuedDpcs();
-
     DPF_ENTER(("[CMiniportWaveRTStream::~CMiniportWaveRTStream]"));
 } // ~CMiniportWaveRTStream
 
@@ -178,6 +181,8 @@ Return Value:
     m_pLoopback = NULL;
     m_llLoopbackFrameOffset = 0;
     m_bCopyProtected = FALSE;
+    m_ullLoopbackFrames = 0;
+    m_ullLoopbackLateFrames = 0;
 
     m_pPortStream = PortStream_;
     InitializeListHead(&m_NotificationList);
@@ -1099,6 +1104,17 @@ NTSTATUS CMiniportWaveRTStream::SetState
 
             KeReleaseSpinLock(&m_PositionSpinLock, oldIrql);
 
+            if (m_bCapture && m_ullLoopbackFrames > 0)
+            {
+                // Late audio = the render stream was running but had not written those
+                // frames in time. If this is not 0, raise LoopbackDelayMs.
+                DPF(D_TERSE, ("Capture stopped: %I64u ms captured, %I64u ms of late audio",
+                    m_ullLoopbackFrames * 1000 / CLoopbackBuffer::SampleRate,
+                    m_ullLoopbackLateFrames * 1000 / CLoopbackBuffer::SampleRate));
+            }
+            m_ullLoopbackFrames = 0;
+            m_ullLoopbackLateFrames = 0;
+
             // Wait until all work items are completed.
             if (!m_bCapture && !g_DoNotCreateDataFiles)
             {
@@ -1120,6 +1136,10 @@ NTSTATUS CMiniportWaveRTStream::SetState
                 //
                 // Run -> Pause
                 //
+                if (!m_bCapture && m_pLoopback)
+                {
+                    m_pLoopback->RenderStopped();
+                }
 
                 // Pause DMA
                 if (m_ulNotificationIntervalMs > 0)
@@ -1159,7 +1179,12 @@ NTSTATUS CMiniportWaveRTStream::SetState
             m_llLoopbackFrameOffset =
                 (LONGLONG)CLoopbackBuffer::FramesFromQpc(ullPerfCounterTemp, m_ullPerformanceCounterFrequency)
                 - (LONGLONG)(m_ullLinearPosition / m_pWfExt->Format.nBlockAlign)
-                - (m_bCapture ? (LONGLONG)CLoopbackBuffer::CaptureDelayFrames : 0);
+                - ((m_bCapture && m_pLoopback) ? (LONGLONG)m_pLoopback->CaptureDelayFrames() : 0);
+
+            if (!m_bCapture && m_pLoopback)
+            {
+                m_pLoopback->RenderStarted(CLoopbackBuffer::FramesFromQpc(ullPerfCounterTemp, m_ullPerformanceCounterFrequency));
+            }
 
             if (m_ulNotificationIntervalMs > 0)
             {
@@ -1310,7 +1335,7 @@ VOID CMiniportWaveRTStream::WriteBytes
 Routine Description:
 
 This function fills the capture buffer with the frames the render stream wrote
-to the loopback CaptureDelayFrames earlier (silence where there are none).
+to the loopback CaptureDelayFrames() earlier (silence where there are none).
 
 Arguments:
 
@@ -1330,7 +1355,7 @@ ByteDisplacement - # of bytes to process.
 
         if (m_pLoopback)
         {
-            m_pLoopback->Read(frame, m_pDmaBuffer + bufferOffset, runWrite / blockAlign, m_pWfExt->Format.wBitsPerSample);
+            m_ullLoopbackLateFrames += m_pLoopback->Read(frame, m_pDmaBuffer + bufferOffset, runWrite / blockAlign, m_pWfExt->Format.wBitsPerSample);
         }
         else
         {
@@ -1338,6 +1363,7 @@ ByteDisplacement - # of bytes to process.
         }
 
         frame += runWrite / blockAlign;
+        m_ullLoopbackFrames += runWrite / blockAlign;
         bufferOffset = (bufferOffset + runWrite) % m_ulDmaBufferSize;
         ByteDisplacement -= runWrite;
     }

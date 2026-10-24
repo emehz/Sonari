@@ -45,7 +45,10 @@ DEFINE_GUIDSTRUCT("79647793-5A53-45FD-BA15-62A5F5757262", PID_SIMPLEAUDIOSAMPLE)
 #define D_BLAB                      DEBUGLVL_BLAB
 #define D_VERBOSE                   DEBUGLVL_VERBOSE        
 #define D_TERSE                     DEBUGLVL_TERSE          
-#define D_ERROR                     DEBUGLVL_ERROR          
+// Sonari: errors are printed at warning level. With DEBUGLVL_ERROR, _DbgPrintF
+// (ksdebug.h) also calls DbgBreakPoint(), which bugchecks a Debug build that has
+// no kernel debugger attached (seen in D4: second device failing to start).
+#define D_ERROR                     DEBUGLVL_WARNING
 #define DPF                         _DbgPrintF
 #define DPF_ENTER(x)                DPF(D_FUNC, x)
 
@@ -166,6 +169,7 @@ typedef struct _PortClassDeviceContext              // 32       64      Byte off
 // Global settings.
 //
 extern DWORD g_DoNotCreateDataFiles;
+extern DWORD g_LoopbackDelayMs;
 extern DWORD g_DisableBthScoBypass;
 extern UNICODE_STRING g_RegistryPath;
 

@@ -14,8 +14,8 @@ Abstract:
     Frames are addressed by an absolute frame index derived from the performance
     counter (see FramesFromQpc). Both streams already advance their positions with
     that same clock, so the render stream writes the frames it "plays" at their
-    index and the capture stream reads the frames CaptureDelayFrames older. There
-    is no drift to compensate between the two sides.
+    index and the capture stream reads the frames CaptureDelayFrames() older.
+    There is no drift to compensate between the two sides.
 
     Frames that the render stream did not write (it was stopped, paused or late)
     read back as silence: gaps are zero-filled when writing resumes and anything
@@ -37,13 +37,37 @@ public:
     static const ULONG SampleRate         = 48000;
     static const ULONG Channels           = 2;
     static const ULONG CapacityFrames     = SampleRate;              // 1 second.
-    static const ULONG CaptureDelayFrames = SampleRate * 30 / 1000;  // 30 ms, see README (D3).
+
+    // Capture delay, configurable with the LoopbackDelayMs registry value (see README).
+    static const ULONG DefaultDelayMs     = 30;
+    static const ULONG MinDelayMs         = 5;
+    static const ULONG MaxDelayMs         = 500;
 
     CLoopbackBuffer();
     ~CLoopbackBuffer();
 
+    // DelayMs is clamped to [MinDelayMs, MaxDelayMs].
     _IRQL_requires_max_(PASSIVE_LEVEL)
-    NTSTATUS Init();
+    NTSTATUS Init
+    (
+        _In_ ULONG DelayMs
+    );
+
+    ULONG CaptureDelayFrames() const
+    {
+        return m_CaptureDelayFrames;
+    }
+
+    // The render stream reports when it starts and stops running, so that a
+    // capture can tell "the render stream is late" from "nothing is playing".
+    _IRQL_requires_max_(DISPATCH_LEVEL)
+    VOID RenderStarted
+    (
+        _In_ ULONGLONG FirstFrame
+    );
+
+    _IRQL_requires_max_(DISPATCH_LEVEL)
+    VOID RenderStopped();
 
     // Absolute frame index (at SampleRate) of the given performance counter value.
     static ULONGLONG FramesFromQpc
@@ -72,8 +96,10 @@ public:
 
     // Copies Frames frames starting at absolute index FirstFrame into Data,
     // converted to BitsPerSample. Frames that are not available read as silence.
+    // Returns how many of them were missing while the render stream was running:
+    // audio that arrived too late for the capture delay (a glitch).
     _IRQL_requires_max_(DISPATCH_LEVEL)
-    VOID Read
+    ULONG Read
     (
         _In_ ULONGLONG                                      FirstFrame,
         _Out_writes_bytes_(Frames * Channels * BitsPerSample / 8) BYTE * Data,
@@ -85,6 +111,9 @@ private:
     KSPIN_LOCK  m_Lock;
     LONG *      m_pSamples;      // CapacityFrames * Channels samples.
     ULONGLONG   m_WrittenEnd;    // One past the newest frame index written so far.
+    ULONG       m_CaptureDelayFrames;
+    BOOLEAN     m_RenderRunning;
+    ULONGLONG   m_RenderStartFrame;  // First frame of the current render run.
 
     LONG * Slot(_In_ ULONGLONG Frame)
     {

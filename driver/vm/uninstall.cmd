@@ -12,6 +12,15 @@ if errorlevel 1 (
 )
 
 devcon.exe remove Root\SonariVirtualAudio
+
+rem devcon: 0 = quitado, 1 = quitado al reiniciar (algo lo tenia abierto), 2 o mas = fallo.
 echo.
-echo Si devcon pide reiniciar, reinicia la maquina virtual.
+if errorlevel 2 (
+    echo ERROR: no se pudo quitar el dispositivo.
+) else if errorlevel 1 (
+    echo IMPORTANTE: el motor de audio de Windows tenia el dispositivo abierto y se
+    echo quitara al reiniciar. REINICIA la maquina virtual antes de volver a instalar.
+) else (
+    echo Dispositivo quitado.
+)
 pause

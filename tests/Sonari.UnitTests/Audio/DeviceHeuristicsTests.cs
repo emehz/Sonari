@@ -29,6 +29,8 @@ public class KnownVirtualDevicesTests
     [InlineData("VoiceMeeter Input (VB-Audio VoiceMeeter VAIO)")]
     [InlineData("Line 1 (Virtual Audio Cable)")]
     [InlineData("Micrófono (Voicemod Virtual Audio Device (WDM))")]
+    [InlineData("Sonari Virtual Output (Sonari Virtual Audio)")]
+    [InlineData("Sonari Virtual Microphone (Sonari Virtual Audio)")]
     public void RecognisesCommonVirtualCables(string name)
     {
         Assert.True(KnownVirtualDevices.IsLikelyVirtual(name));

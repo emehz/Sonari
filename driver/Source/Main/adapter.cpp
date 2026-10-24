@@ -50,6 +50,11 @@ DRIVER_DISPATCH PnpHandler;
 //
 DWORD g_DoNotCreateDataFiles = 1;  // default is off.
 DWORD g_DisableToneGenerator = 0;  // default is to generate tones.
+//
+// Delay of the capture endpoint behind the render endpoint, in ms (Sonari).
+// Registry value LoopbackDelayMs (DWORD) under the service's Parameters key.
+//
+DWORD g_LoopbackDelayMs = 30;
 UNICODE_STRING g_RegistryPath;      // This is used to store the registry settings path for the driver
 
 //-----------------------------------------------------------------------------
@@ -200,6 +205,7 @@ Returns:
     // QueryRoutine     Flags                                               Name                     EntryContext             DefaultType                                                    DefaultData              DefaultLength
         { NULL,   RTL_QUERY_REGISTRY_DIRECT | RTL_QUERY_REGISTRY_TYPECHECK, L"DoNotCreateDataFiles", &g_DoNotCreateDataFiles, (REG_DWORD << RTL_QUERY_REGISTRY_TYPECHECK_SHIFT) | REG_DWORD, &g_DoNotCreateDataFiles, sizeof(ULONG)},
         { NULL,   RTL_QUERY_REGISTRY_DIRECT | RTL_QUERY_REGISTRY_TYPECHECK, L"DisableToneGenerator", &g_DisableToneGenerator, (REG_DWORD << RTL_QUERY_REGISTRY_TYPECHECK_SHIFT) | REG_DWORD, &g_DisableToneGenerator, sizeof(ULONG)},
+        { NULL,   RTL_QUERY_REGISTRY_DIRECT | RTL_QUERY_REGISTRY_TYPECHECK, L"LoopbackDelayMs",      &g_LoopbackDelayMs,      (REG_DWORD << RTL_QUERY_REGISTRY_TYPECHECK_SHIFT) | REG_DWORD, &g_LoopbackDelayMs,      sizeof(ULONG)},
         { NULL,   0,                                                        NULL,                    NULL,                    0,                                                             NULL,                    0}
     };
 

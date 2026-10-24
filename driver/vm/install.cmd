@@ -29,6 +29,17 @@ certutil -addstore -f Root SonariTest.cer >nul || goto :error
 certutil -addstore -f TrustedPublisher SonariTest.cer >nul || goto :error
 
 echo [2/3] Comprobando si el dispositivo ya existe...
+rem "findall" tambien lista los dispositivos quitados que esperan un reinicio; "find" no.
+devcon.exe findall %HWID% | find /i "Root\" >nul
+if not errorlevel 1 (
+    devcon.exe find %HWID% | find /i "Root\" >nul
+    if errorlevel 1 (
+        echo Hay un dispositivo de Sonari pendiente de quitar. Reinicia la maquina
+        echo virtual antes de instalar: instalar ahora puede dejar Windows bloqueado.
+        pause
+        exit /b 1
+    )
+)
 devcon.exe find %HWID% | find /i "Root\" >nul
 if not errorlevel 1 (
     echo El dispositivo ya existe: actualizando el driver.

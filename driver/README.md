@@ -2,7 +2,7 @@
 
 Driver de audio virtual en modo kernel (WaveRT/PortCls) que acabará siendo el **«Sonari Virtual Microphone»**: Sonari escribirá su mezcla en un altavoz virtual y Discord, los juegos u OBS la leerán como si fuera un micrófono, sin depender de VB-CABLE.
 
-> **Estado: etapa D3.** Funciona como un cable virtual: lo que cualquier aplicación reproduce en «Sonari Virtual Output» lo graba quien abra «Sonari Virtual Microphone», con 30 ms de retardo. Falta la etapa de estabilidad (D4) antes de usarlo fuera de la máquina virtual.
+> **Estado: etapa D4 superada.** Funciona como un cable virtual: lo que cualquier aplicación reproduce en «Sonari Virtual Output» lo graba quien abra «Sonari Virtual Microphone», con 30 ms de retardo. Pasó Driver Verifier y las pruebas de retirada en caliente. Sigue siendo solo para la máquina virtual hasta que tenga instalador y firma (D6).
 
 ## Origen y licencia
 
@@ -27,6 +27,9 @@ Driver de audio virtual en modo kernel (WaveRT/PortCls) que acabará siendo el *
 | D3 | `Utilities/LoopbackBuffer.*` (nuevos) | Buffer circular de 1 s entre la salida y el micrófono | Es el «cable» en sí. Ver [Cómo funciona el loopback](#cómo-funciona-el-loopback-d3) |
 | D3 | `common.h`, `common.cpp` | El adaptador crea y libera el buffer y lo ofrece con `GetLoopback()` | Hay un solo buffer por dispositivo, compartido por los dos streams |
 | D3 | `minwavertstream.*` | La salida copia lo que reproduce al buffer (`WriteLoopback`); el micrófono lee de él (`WriteBytes`) en lugar de generar el tono | Conecta los dos endpoints. El generador de tono (`ToneGenerator.*`) queda en el proyecto, sin usar |
+| D4 | `speakertoptable.h`, `micarray1toptable.h` | Sin nodos de volumen ni de silencio en las topologías | Así Windows aplica el volumen y el silencio por software ([documentación](https://learn.microsoft.com/en-us/windows-hardware/drivers/audio/software-volume-control-support)). Antes los controles de Windows no hacían nada |
+| D4 | `adapter.cpp`, `LoopbackBuffer.*` | Retardo configurable con el valor de registro `LoopbackDelayMs` (5–500 ms, 30 por defecto) | Ajustarlo en cada equipo sin recompilar |
+| D4 | `LoopbackBuffer.*`, `minwavertstream.*` | Contador de «audio tardío» y mensaje de depuración al parar la captura | Medir si el retardo es suficiente (ver [Pruebas de D4](#pruebas-de-d4)) |
 
 Los identificadores internos del código C++ (clases `CMiniportTopologySimpleAudioSample`, secciones `SIMPLEAUDIOSAMPLE_*` del INF, `WaveMicArray1`…) se mantienen a propósito: no se ven fuera del driver y así es fácil comparar con el original de Microsoft.
 
@@ -76,7 +79,7 @@ Para quitarlo, ejecuta `uninstall.cmd` como administrador, o mejor, restaura la 
 
 * **Un reloj común.** El ejemplo de Microsoft no tiene hardware: cada stream avanza su posición según el tiempo del contador de rendimiento de Windows (QPC). El buffer numera cada muestra con ese mismo reloj (48 000 por segundo), así que la salida y el micrófono van exactamente a la misma velocidad y no hay deriva que compensar.
 * **La salida escribe** cada bloque que «reproduce» en la posición que le corresponde según ese reloj.
-* **El micrófono lee 30 ms por detrás.** La salida actualiza su posición cada 10 ms aproximadamente, así que el micrófono espera a que esos datos estén escritos. Los 30 ms dejan margen para los retrasos del temporizador, sobre todo en máquinas virtuales. Se medirá y ajustará en D4.
+* **El micrófono lee 30 ms por detrás** (configurable, ver abajo). La salida actualiza su posición cada 10 ms aproximadamente, así que el micrófono espera a que esos datos estén escritos. El margen cubre los retrasos del temporizador, mayores en máquinas virtuales.
 * **Silencio cuando no hay nada.** Si nadie reproduce, la salida está en pausa o llega tarde, el micrófono recibe silencio, nunca audio antiguo: los huecos se rellenan con ceros y lo que tiene más de 1 s se considera sobrescrito.
 * **Formatos.** La salida trabaja a 48 kHz, estéreo, 16 bits; el micrófono a 48 kHz, estéreo, 32 bits. El buffer guarda enteros de 32 bits y convierte. Windows convierte lo que mandan las aplicaciones al formato de la salida.
 * **Contenido protegido (DRM).** Si Windows marca lo que se reproduce como protegido contra copia, la salida escribe silencio. El INF declara el driver como compatible con DRM, así que está obligado a no dejarlo grabar.
@@ -84,13 +87,35 @@ Para quitarlo, ejecuta `uninstall.cmd` como administrador, o mejor, restaura la 
 
 ### Limitaciones conocidas
 
-* **Los controles de volumen y silencio de Windows no afectan al audio.** Ni el de «Sonari Virtual Output» ni el de «Sonari Virtual Microphone» (Propiedades → Niveles). El driver declara controles de volumen propios, así que Windows no los aplica por software, y el ejemplo de Microsoft solo guarda el valor. Sonari tiene su propio volumen, así que no bloquea; se resolverá en D4.
 * **16 bits en la salida.** Suficiente para voz y para Discord, que comprime con Opus. Se puede subir a 24 o 32 bits más adelante.
 * **Un solo stream por endpoint.** Es lo normal en modo compartido (Windows mezcla todas las aplicaciones en uno). En modo exclusivo, solo una aplicación a la vez.
+
+### Ajustar el retardo
+
+El valor `LoopbackDelayMs` (DWORD, en milisegundos) se lee al cargar el driver:
+
+```
+reg add HKLM\SYSTEM\CurrentControlSet\Services\SonariAudio\Parameters /v LoopbackDelayMs /t REG_DWORD /d 20 /f
+```
+
+Después hay que recargar el driver: deshabilitar y volver a habilitar «Sonari Virtual Audio» en el Administrador de dispositivos, o reiniciar. Menos retardo = menos latencia, pero si la salida llega tarde se oyen cortes; el contador de audio tardío lo detecta.
+
+## Pruebas de D4
+
+Siempre en la máquina virtual, partiendo de la instantánea «Base de pruebas».
+
+1. **Volumen y silencio.** Con «Escuchar este dispositivo» activado en el micrófono y música sonando por «Sonari Virtual Output»: bajar el volumen o silenciar la salida (Propiedades → Niveles) y luego el micrófono debe bajar o silenciar lo que se oye.
+2. **Driver Verifier.** `verifier /standard /driver SonariAudio.sys` como administrador y reiniciar (`verifier /querysettings` para comprobarlo). Con él activo: 10 minutos de música con pausas, deshabilitar y habilitar el dispositivo varias veces mientras suena, y `uninstall.cmd` / `install.cmd`. Al acabar, `verifier /reset` y reiniciar. Si hay pantalla azul, copiar `C:\Windows\MEMORY.DMP` antes de restaurar la instantánea.
+3. **Audio tardío y retardo.** Con [DebugView](https://learn.microsoft.com/en-us/sysinternals/downloads/debugview) (Sysinternals, de Microsoft) como administrador y *Capture Kernel* + *Enable Verbose Kernel Output* activados, cada vez que se para una captura aparece `SONARI: Capture stopped: N ms captured, M ms of late audio`. Repetir con `LoopbackDelayMs` = 30, 20 y 10.
+
+Los mensajes de depuración solo existen en la compilación Debug, que es la que genera `build.ps1` por defecto.
 
 ## Hallazgos de las pruebas
 
 * **Modo de prueba:** si Windows no arrancó en modo de prueba, el dispositivo aparece con el código 52 (firma no comprobable). `install.cmd` lo comprueba antes de instalar.
+* **Deshabilitar pide reiniciar.** Windows anota el motivo en el Visor de eventos (Sistema, Kernel-PnP, id. 225): `audiodg.exe`, el motor de audio de Windows, tiene abiertos los endpoints y bloquea la retirada en caliente. Ocurre con «Sonari Virtual Output» como salida predeterminada, o con el Panel de Sonido o una aplicación usándolo. El driver no puede cerrar esas conexiones; al reiniciar se aplica el cambio sin problemas. Lo mismo pasa con VB-CABLE, que pide reiniciar al instalar y desinstalar. Habrá que tenerlo en cuenta en el instalador (D6).
+* **Pantalla azul al instalar con un dispositivo pendiente de quitar (corregido).** El driver admite un solo dispositivo a la vez, así que el segundo no arranca (`STATUS_DEVICE_BUSY`, código 10). El ejemplo de Microsoft lo notifica con un mensaje de nivel error, y en la compilación Debug, `_DbgPrintF` (`ksdebug.h`) llama a `DbgBreakPoint()` tras cualquier mensaje de error. Sin un depurador conectado, eso es una pantalla azul `0x7E` (`STATUS_BREAKPOINT`), que VirtualBox no llegó a mostrar: parecía un cuelgue. Lo encontró el volcado de la VM: `SonariAudio!StartDevice` → `DbgPrint` → `int 3`. Ahora `D_ERROR` imprime con nivel de aviso y no detiene el sistema (0 de 116 mensajes lo hacen). Además, `install.cmd` ya no instala si hay un dispositivo pendiente de quitar, y `uninstall.cmd` avisa de que hay que reiniciar.
+* **Pantalla azul al desinstalar con música sonando (corregido).** Código `0xD1` en `TimerNotifyRT` (`minwavertstream.cpp`). Al quitar el dispositivo, `PnpHandler` libera el adaptador en cuanto llega la retirada, pero `audiodg.exe` todavía tiene el stream abierto y su temporizador sigue usando el adaptador (y su buffer de loopback) ya liberado. El miniport de onda del ejemplo de Microsoft guardaba una referencia débil al adaptador. Ahora guarda una fuerte, como ya hacían los miniports de topología, y el adaptador vive hasta que se cierra el último stream. Además, el destructor del stream detiene su temporizador **antes** de liberar nada: antes lo hacía al final, después de liberar el formato que el temporizador lee cada milisegundo.
 
 ## Plan
 
@@ -99,7 +124,7 @@ Para quitarlo, ejecuta `uninstall.cmd` como administrador, o mejor, restaura la 
 | D0 | Herramientas en el PC y VM en modo de prueba ✅ |
 | D1 | Compilar el ejemplo sin cambios de comportamiento e instalarlo en Windows 10 ✅ (verificado en Windows 10 22H2, build 19045, el 23/10/2026) |
 | D2 | Nombres propios: «Sonari Virtual Microphone» y «Sonari Virtual Output», con identificadores de hardware de Sonari ✅ (verificado en Windows 10 22H2 el 23/10/2026) |
-| **D3** | **Conectar la salida con el micrófono (buffer circular en el kernel): lo que Sonari reproduce, lo graba quien abra el micrófono** |
-| D4 | Estabilidad: Driver Verifier, horas de reproducción, suspensión, varios clientes a la vez, medir y ajustar el retardo, controles de volumen |
-| D5 | Sonari detecta su propio driver y lo prefiere a VB-CABLE |
+| D3 | Conectar la salida con el micrófono (buffer circular en el kernel): lo que Sonari reproduce, lo graba quien abra el micrófono ✅ (verificado en Windows 10 22H2 el 24/10/2026: más de 11 min con pausas, sin cortes ni pantallas azules) |
+| D4 | Estabilidad: Driver Verifier, retirada en caliente, controles de volumen ✅ (verificado en Windows 10 22H2 el 24/10/2026, con Driver Verifier: desinstalar con música sonando, reinstalar sin reiniciar y volumen y silencio de los dos dispositivos). Pendiente: medir el retardo con DebugView para bajar de 30 ms |
+| **D5** | **Sonari detecta su propio driver y lo prefiere a VB-CABLE** |
 | D6 | Instalador y firma para distribuirlo (certificado EV y firma de Microsoft) |

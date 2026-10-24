@@ -47,6 +47,12 @@ public sealed record AudioSettings
 
     public string? VirtualOutputDeviceId { get; init; }
 
+    /// <summary>
+    /// El usuario eligió alguna vez la salida del micrófono virtual, aunque fuera «Desactivado». Mientras sea
+    /// <c>false</c>, Sonari puede elegir por su cuenta la de su propio driver.
+    /// </summary>
+    public bool VirtualOutputChosen { get; init; }
+
     /// <summary>Fuentes de aplicación y de sistema que el usuario añadió al mezclador (el micrófono siempre está).</summary>
     public IReadOnlyList<SavedSource> Sources { get; init; } = [];
 

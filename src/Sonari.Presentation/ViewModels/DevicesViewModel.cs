@@ -26,6 +26,10 @@ public sealed partial class DevicesViewModel : PageViewModel
     [NotifyPropertyChangedFor(nameof(VirtualDeviceSummary))]
     private bool _hasVirtualDevice;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(VirtualDeviceSummary))]
+    private bool _hasSonariDriver;
+
     public DevicesViewModel(IAudioDeviceCatalog catalog, ILogger<DevicesViewModel> logger)
         : base("devices", "Dispositivos", "\uE7F5",
             "Entradas y salidas de audio detectadas en Windows y compatibilidad del sistema.")
@@ -38,11 +42,15 @@ public sealed partial class DevicesViewModel : PageViewModel
 
     public ObservableCollection<AudioEndpointInfo> Outputs { get; } = [];
 
-    public string VirtualDeviceSummary => HasVirtualDevice
-        ? "Hay un cable virtual instalado (marcado abajo). Elige su entrada en el Mezclador, en «Micrófono virtual», " +
-          "y su salida como micrófono en Discord."
-        : "No hay ningún cable virtual instalado. Instala VB-CABLE (gratuito para uso personal) desde vb-audio.com/Cable: " +
-          "descomprime el ZIP, ejecuta VBCABLE_Setup_x64.exe como administrador y reinicia. Sonari todavía no instala su propio driver.";
+    public string VirtualDeviceSummary => HasSonariDriver
+        ? "El driver de Sonari está instalado. El Mezclador envía el micrófono virtual a «Sonari Virtual Output», " +
+          "y en Discord eliges «Sonari Virtual Microphone» como micrófono."
+        : HasVirtualDevice
+            ? "Hay un cable virtual instalado (marcado abajo). Elige su entrada en el Mezclador, en «Micrófono virtual», " +
+              "y su salida como micrófono en Discord."
+            : "No hay ningún cable virtual instalado. El driver propio de Sonari todavía está en pruebas y no se distribuye; " +
+              "mientras tanto, instala VB-CABLE (gratuito para uso personal) desde vb-audio.com/Cable: descomprime el ZIP, " +
+              "ejecuta VBCABLE_Setup_x64.exe como administrador y reinicia.";
 
     public override async Task OnNavigatedToAsync()
     {
@@ -69,6 +77,7 @@ public sealed partial class DevicesViewModel : PageViewModel
             Replace(Outputs, outputs);
             Capabilities = capabilities;
             HasVirtualDevice = inputs.Any(e => e.IsLikelyVirtual) || outputs.Any(e => e.IsLikelyVirtual);
+            HasSonariDriver = outputs.Any(SonariVirtualDevice.IsSonari);
             _loadedOnce = true;
         }
         catch (Exception ex)

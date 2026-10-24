@@ -157,6 +157,8 @@ Return Value:
         m_SystemStreams = NULL;
     }
 
+    SAFE_RELEASE(m_pAdapterCommon);
+
 } // ~CMiniportWaveRT
 
 //=============================================================================

@@ -122,6 +122,9 @@ protected:
     LONGLONG                    m_llLoopbackFrameOffset;
     // Protected (DRM) content must not reach the capture endpoint.
     BOOLEAN                     m_bCopyProtected;
+    // Capture statistics since the stream last left STOP, printed when it stops.
+    ULONGLONG                   m_ullLoopbackFrames;
+    ULONGLONG                   m_ullLoopbackLateFrames;
 
 public:
 

@@ -132,7 +132,12 @@ public:
     {
         PAGED_CODE();
 
-        m_pAdapterCommon = (PADAPTERCOMMON)UnknownAdapter; // weak ref.
+        // Strong reference (Sonari): the streams use the adapter from their timer,
+        // including its loopback buffer, and the adapter is released by PnpHandler
+        // on surprise removal while audiodg may still have streams running. The
+        // cycle adapter -> subdevice cache -> miniport is broken by Cleanup().
+        m_pAdapterCommon = (PADAPTERCOMMON)UnknownAdapter;
+        UnknownAdapter->AddRef();
 
         if (MiniportPair->WaveDescriptor)
         {

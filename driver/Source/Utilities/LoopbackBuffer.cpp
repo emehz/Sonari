@@ -20,7 +20,10 @@ Abstract:
 #pragma code_seg("PAGE")
 CLoopbackBuffer::CLoopbackBuffer()
     : m_pSamples(NULL),
-      m_WrittenEnd(0)
+      m_WrittenEnd(0),
+      m_CaptureDelayFrames(SampleRate * DefaultDelayMs / 1000),
+      m_RenderRunning(FALSE),
+      m_RenderStartFrame(0)
 {
     PAGED_CODE();
     KeInitializeSpinLock(&m_Lock);
@@ -42,9 +45,15 @@ CLoopbackBuffer::~CLoopbackBuffer()
 //=============================================================================
 #pragma code_seg("PAGE")
 _IRQL_requires_max_(PASSIVE_LEVEL)
-NTSTATUS CLoopbackBuffer::Init()
+NTSTATUS CLoopbackBuffer::Init
+(
+    _In_ ULONG DelayMs
+)
 {
     PAGED_CODE();
+
+    DelayMs = max(MinDelayMs, min(DelayMs, MaxDelayMs));
+    m_CaptureDelayFrames = SampleRate * DelayMs / 1000;
 
     // ExAllocatePool2 zeroes the allocation, so the buffer starts as silence.
     m_pSamples = (LONG *)ExAllocatePool2(
@@ -81,6 +90,32 @@ BOOLEAN CLoopbackBuffer::IsSupportedFormat
            Format->nChannels == Channels &&
            (Format->wBitsPerSample == 16 || Format->wBitsPerSample == 32) &&
            Format->nBlockAlign == Channels * Format->wBitsPerSample / 8;
+}
+
+//=============================================================================
+#pragma code_seg()
+_IRQL_requires_max_(DISPATCH_LEVEL)
+VOID CLoopbackBuffer::RenderStarted
+(
+    _In_ ULONGLONG FirstFrame
+)
+{
+    KIRQL oldIrql;
+    KeAcquireSpinLock(&m_Lock, &oldIrql);
+    m_RenderRunning = TRUE;
+    m_RenderStartFrame = FirstFrame;
+    KeReleaseSpinLock(&m_Lock, oldIrql);
+}
+
+//=============================================================================
+#pragma code_seg()
+_IRQL_requires_max_(DISPATCH_LEVEL)
+VOID CLoopbackBuffer::RenderStopped()
+{
+    KIRQL oldIrql;
+    KeAcquireSpinLock(&m_Lock, &oldIrql);
+    m_RenderRunning = FALSE;
+    KeReleaseSpinLock(&m_Lock, oldIrql);
 }
 
 //=============================================================================
@@ -168,7 +203,7 @@ VOID CLoopbackBuffer::Write
 //=============================================================================
 #pragma code_seg()
 _IRQL_requires_max_(DISPATCH_LEVEL)
-VOID CLoopbackBuffer::Read
+ULONG CLoopbackBuffer::Read
 (
     _In_ ULONGLONG      FirstFrame,
     _Out_writes_bytes_(Frames * Channels * BitsPerSample / 8) BYTE * Data,
@@ -176,15 +211,17 @@ VOID CLoopbackBuffer::Read
     _In_ USHORT         BitsPerSample
 )
 {
+    ULONG lateFrames = 0;
+
     if (Frames == 0)
     {
-        return;
+        return 0;
     }
 
     if (m_pSamples == NULL)
     {
         RtlZeroMemory(Data, (SIZE_T)Frames * Channels * (BitsPerSample / 8));
-        return;
+        return 0;
     }
 
     KIRQL oldIrql;
@@ -198,6 +235,11 @@ VOID CLoopbackBuffer::Read
         ULONGLONG frame = FirstFrame + i;
         BOOLEAN available = frame >= oldest && frame < m_WrittenEnd;
         const LONG * slot = available ? Slot(frame) : NULL;
+
+        if (!available && m_RenderRunning && frame >= m_WrittenEnd && frame >= m_RenderStartFrame)
+        {
+            lateFrames++;
+        }
 
         for (ULONG channel = 0; channel < Channels; channel++)
         {
@@ -215,4 +257,6 @@ VOID CLoopbackBuffer::Read
     }
 
     KeReleaseSpinLock(&m_Lock, oldIrql);
+
+    return lateFrames;
 }

@@ -8,6 +8,7 @@ public static class KnownVirtualDevices
 {
     private static readonly string[] NameFragments =
     [
+        "Sonari Virtual",
         "VB-Audio",
         "CABLE Input",
         "CABLE Output",
