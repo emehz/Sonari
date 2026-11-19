@@ -73,6 +73,8 @@ El **orden** se cambia con las flechas de cada tarjeta, y «Restablecer orden» 
     * Con el interruptor general apagado la voz pasa intacta.
     * La voz sobrevive a un reinicio de la aplicación.
 
+* **Prueba manual:** confirmada el 24/10/2026. Las voces predefinidas y los efectos suenan como se espera.
+
 ## Prueba manual que te pido
 
 Con auriculares, para que tus altavoces no se cuelen en el micrófono:
