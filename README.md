@@ -81,4 +81,8 @@ Sonari nunca graba ni guarda audio sin una acción explícita del usuario, y sol
 
 ## Licencia
 
-Por decidir. El driver de `driver/` deriva de un ejemplo de Microsoft y se distribuye bajo la Microsoft Public License (MS-PL), incluida en [driver/LICENSE](driver/LICENSE).
+Sonari es software libre: puedes usarlo, estudiarlo, modificarlo y redistribuirlo bajo los términos de la **GNU General Public License v3.0 o posterior** (GPL-3.0-or-later), incluida en [LICENSE](LICENSE). Si distribuyes una versión modificada, tiene que llevar también su código fuente bajo la GPL. Se ofrece sin ninguna garantía.
+
+La excepción es el driver de `driver/`. Deriva de un ejemplo de Microsoft y se distribuye bajo la Microsoft Public License (MS-PL), incluida en [driver/LICENSE](driver/LICENSE). Es un programa independiente de la aplicación: solo comparte repositorio.
+
+Las dependencias (tabla de arriba) tienen licencias MIT y Apache-2.0, compatibles con la GPL-3.0.
